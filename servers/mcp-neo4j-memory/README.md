@@ -1,5 +1,15 @@
 # 🧠🕸️ Neo4j Knowledge Graph Memory MCP Server
 
+## 🍴 Extended Knowledge Graph Features (`eljese/mcp-neo4j`)
+
+This is an enhanced version of the Neo4j Memory server, adding advanced bitemporal logic and persona tracking for AI Hive Mind systems.
+
+### 🛡️ Custom Improvements
+1.  **Bitemporal Ledger:** Replaces the flat observation model with a bitemporal structure (`valid_time` vs `transaction_time`), allowing the AI to track how facts change over time while preserving historical accuracy.
+2.  **Persona Attribution:** Every observation is tagged with `asserted_by`, enabling multi-agent coordination and audit trails for which agent/persona contributed specific knowledge.
+3.  **Vector Engine:** Integrated `vector_engine.py` for generating high-density semantic embeddings via Gemini/Ollama, enabling hybrid vector + fulltext search across the knowledge graph.
+4.  **Memory Domains:** Added `node_set` support for logical isolation of memory contexts (e.g., project-specific vs. global semantic memory).
+
 mcp-name: io.github.neo4j-contrib/mcp-neo4j-memory
 
 ## 🌟 Overview
