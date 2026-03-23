@@ -1,37 +1,18 @@
-FROM python:3.13.8-slim
+FROM python:3.12-slim
 
-LABEL io.modelcontextprotocol.server.name="io.github.neo4j-contrib/mcp-neo4j-memory"
-
-# Set working directory
 WORKDIR /app
 
-# Install build dependencies
-RUN pip install --no-cache-dir hatchling
+# Install build dependencies if needed (for some python packages)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files first
-COPY pyproject.toml /app/
+# Copy project files
+COPY pyproject.toml README.md ./
+COPY src ./src
 
-# Install runtime dependencies
-RUN pip install --no-cache-dir fastmcp>=2.0.0 neo4j>=5.26.0
+# Install project and dependencies
+RUN pip install --no-cache-dir .
 
-# Copy the source code
-COPY src/ /app/src/
-COPY README.md /app/
-
-# Install the package
-RUN pip install --no-cache-dir -e .
-
-# Environment variables for Neo4j connection
-ENV NEO4J_URL="bolt://host.docker.internal:7687"
-ENV NEO4J_USERNAME="neo4j"
-ENV NEO4J_PASSWORD="password"
-ENV NEO4J_DATABASE="neo4j"
-ENV NEO4J_TRANSPORT="stdio"
-ENV NEO4J_MCP_SERVER_HOST="0.0.0.0"
-ENV NEO4J_MCP_SERVER_PORT="8000"
-ENV NEO4J_MCP_SERVER_PATH="/mcp/"
-ENV NEO4J_MCP_SERVER_ALLOW_ORIGINS=""
-ENV NEO4J_MCP_SERVER_ALLOWED_HOSTS="localhost,127.0.0.1"
-
-# Command to run the server using the package entry point
-CMD ["sh", "-c", "mcp-neo4j-memory"]
+# Default to STDIO transport as used in Gemini CLI
+ENTRYPOINT ["mcp-neo4j-memory"]

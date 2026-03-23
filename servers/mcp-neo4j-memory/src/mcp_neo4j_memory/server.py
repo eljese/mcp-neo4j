@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Literal
+from typing import Literal, Optional
 
 from neo4j import AsyncGraphDatabase
 from pydantic import Field
@@ -15,7 +15,8 @@ from mcp.types import TextContent
 from neo4j.exceptions import Neo4jError
 from mcp.types import ToolAnnotations
 
-from .neo4j_memory import Neo4jMemory, Entity, Relation, ObservationAddition, ObservationDeletion, KnowledgeGraph
+from .neo4j_memory import Neo4jMemory, Entity, Relation, ObservationAddition, ObservationDeletion, KnowledgeGraph, Feedback
+from .vector_engine import VectorEngine, GeminiVectorEngine, OllamaVectorEngine
 from .utils import format_namespace
 
 # Set up logging
@@ -30,7 +31,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
     """Create an MCP server instance for memory management."""
     
     namespace_prefix = format_namespace(namespace)
-    mcp: FastMCP = FastMCP("mcp-neo4j-memory", stateless_http=True)
+    mcp: FastMCP = FastMCP("mcp-neo4j-memory")
 
     @mcp.tool(
         name=namespace_prefix + "read_graph",
@@ -78,12 +79,11 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
                                           destructiveHint=False, 
                                           idempotentHint=True, 
                                           openWorldHint=True))
-    async def create_entities(entities: list[Entity] = Field(..., description="List of entities to create with name, type, and observations")) -> ToolResult:
+    async def create_entities(entities: list[Entity] = Field(..., description="List of entities to create with name, type, observations, and asserted_by")) -> ToolResult:
         """Create multiple new entities in the knowledge graph.
         
-        Creates new memory entities with their associated observations. If an entity with the same name
-        already exists, this operation will merge the observations with existing ones.
-        
+        Creates new memory entities with their associated observations. 
+        Note: The graph uses an append-only bitemporal ledger. This sets up the initial facts.
             
         Returns:
             list[Entity]: The created entities with their final state
@@ -94,12 +94,8 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
                 {
                     "name": "Alice Johnson",
                     "type": "person",
-                    "observations": ["Software engineer", "Lives in Seattle", "Enjoys hiking"]
-                },
-                {
-                    "name": "Microsoft",
-                    "type": "company", 
-                    "observations": ["Technology company", "Headquartered in Redmond, WA"]
+                    "observations": ["Software engineer", "Lives in Seattle"],
+                    "asserted_by": "Global Architect"
                 }
             ]
         }
@@ -140,11 +136,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
                     "source": "Alice Johnson",
                     "target": "Microsoft", 
                     "relationType": "WORKS_AT"
-                },
-                {
-                    "source": "Alice Johnson",
-                    "target": "Seattle",
-                    "relationType": "LIVES_IN"
                 }
             ]
         }
@@ -163,6 +154,35 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             raise ToolError(f"Error creating relations: {e}")
 
     @mcp.tool(
+        name=namespace_prefix + "add_feedback",
+        annotations=ToolAnnotations(title="Add Feedback", 
+                                          readOnlyHint=False, 
+                                          destructiveHint=False, 
+                                          idempotentHint=False, 
+                                          openWorldHint=True))
+    async def add_feedback(source: str, target: str, relationType: str, sentiment: float, asserted_by: str = "System") -> ToolResult:
+        """Apply feedback to a relationship to adjust its weight.
+        
+        Sentiment should be between -5.0 and 5.0. 
+        Positive sentiment increases weight, negative decreases it.
+        """
+        logger.info(f"MCP tool: add_feedback ({relationType} from {source} to {target})")
+        try:
+            feedback = Feedback(
+                source=source,
+                target=target,
+                relationType=relationType,
+                sentiment=sentiment,
+                asserted_by=asserted_by
+            )
+            result = await memory.add_feedback(feedback)
+            return ToolResult(content=[TextContent(type="text", text=json.dumps(result))],
+                          structured_content=result)
+        except Exception as e:
+            logger.error(f"Error adding feedback: {e}")
+            raise ToolError(f"Error adding feedback: {e}")
+
+    @mcp.tool(
         name=namespace_prefix + "add_observations",
         annotations=ToolAnnotations(title="Add Observations", 
                                           readOnlyHint=False, 
@@ -172,8 +192,8 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
     async def add_observations(observations: list[ObservationAddition] = Field(..., description="List of observations to add to existing entities")) -> ToolResult:
         """Add new observations/facts to existing entities in the knowledge graph.
         
-        Appends new observations to entities that already exist. The entity must be present
-        in the graph before adding observations. Each observation should be a distinct fact.
+        Appends new observations as unique nodes linked via SUPERSEDES to track temporal changes.
+        Use 'asserted_by' to define the persona adding the fact.
         
         Returns:
             list[dict]: Details about the added observations including entity name and new facts
@@ -183,11 +203,8 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             "observations": [
                 {
                     "entityName": "Alice Johnson",
-                    "observations": ["Promoted to Senior Engineer", "Completed AWS certification"]
-                },
-                {
-                    "entityName": "Microsoft",
-                    "observations": ["Launched new AI products", "Stock price increased 15%"]
+                    "observations": ["Promoted to Senior Engineer", "Completed AWS certification"],
+                    "asserted_by": "The Coach"
                 }
             ]
         }
@@ -212,11 +229,11 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
                                           destructiveHint=True, 
                                           idempotentHint=True, 
                                           openWorldHint=True))
-    async def delete_entities(entityNames: list[str] = Field(..., description="List of exact entity names to delete permanently")) -> ToolResult:
-        """Delete entities and all their associated relationships from the knowledge graph.
+    async def delete_entities(entityNames: list[str] = Field(..., description="List of exact entity names to delete (deprecate)")) -> ToolResult:
+        """Mark entities and their associated observations as deprecated/deleted.
         
-        Permanently removes entities from the graph along with all relationships they participate in.
-        This is a destructive operation that cannot be undone. Entity names must match exactly.
+        Following the Axiom of Non-Erasure, this does not actually destroy the node, but appends
+        a deprecation observation so it is excluded from normal queries.
         
         Returns:
             str: Success confirmation message
@@ -225,14 +242,12 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         {
             "entityNames": ["Old Company", "Outdated Person"]
         }
-        
-        Warning: This will delete the entities and ALL relationships they're involved in.
         """
         logger.info(f"MCP tool: delete_entities ({len(entityNames)} entities)")
         try:
             await memory.delete_entities(entityNames)
-            return ToolResult(content=[TextContent(type="text", text="Entities deleted successfully")],
-                              structured_content={"result": "Entities deleted successfully"})
+            return ToolResult(content=[TextContent(type="text", text="Entities deprecated successfully")],
+                              structured_content={"result": "Entities deprecated successfully"})
         except Neo4jError as e:
             logger.error(f"Neo4j error deleting entities: {e}")
             raise ToolError(f"Neo4j error deleting entities: {e}")
@@ -247,11 +262,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
                                           destructiveHint=True, 
                                           idempotentHint=True, 
                                           openWorldHint=True))
-    async def delete_observations(deletions: list[ObservationDeletion] = Field(..., description="List of specific observations to remove from entities")) -> ToolResult:
-        """Delete specific observations from existing entities in the knowledge graph.
+    async def delete_observations(deletions: list[ObservationDeletion] = Field(..., description="List of specific observations to deprecate from entities")) -> ToolResult:
+        """Mark specific observations as deleted/deprecated.
         
-        Removes specific observation texts from entities. The observation text must match exactly
-        what is stored. The entity will remain but the specified observations will be deleted.
+        Following the Axiom of Non-Erasure, the observation is flagged as deleted rather than destroyed.
         
         Returns:
             str: Success confirmation message
@@ -261,23 +275,18 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             "deletions": [
                 {
                     "entityName": "Alice Johnson",
-                    "observations": ["Old job title", "Outdated phone number"]
-                },
-                {
-                    "entityName": "Microsoft", 
-                    "observations": ["Former CEO information"]
+                    "observations": ["Old job title", "Outdated phone number"],
+                    "asserted_by": "System"
                 }
             ]
         }
-        
-        Note: Observation text must match exactly (case-sensitive) to be deleted.
         """
         logger.info(f"MCP tool: delete_observations ({len(deletions)} deletions)")
         try:    
             deletion_objects = [ObservationDeletion.model_validate(deletion) for deletion in deletions]
             await memory.delete_observations(deletion_objects)
-            return ToolResult(content=[TextContent(type="text", text="Observations deleted successfully")],
-                          structured_content={"result": "Observations deleted successfully"})
+            return ToolResult(content=[TextContent(type="text", text="Observations deprecated successfully")],
+                          structured_content={"result": "Observations deprecated successfully"})
         except Neo4jError as e:
             logger.error(f"Neo4j error deleting observations: {e}")
             raise ToolError(f"Neo4j error deleting observations: {e}")
@@ -309,11 +318,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
                     "source": "Alice Johnson",
                     "target": "Old Company",
                     "relationType": "WORKS_AT"
-                },
-                {
-                    "source": "John Smith", 
-                    "target": "Former City",
-                    "relationType": "LIVES_IN"
                 }
             ]
         }
@@ -340,26 +344,24 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
                                           destructiveHint=False, 
                                           idempotentHint=True, 
                                           openWorldHint=True))
-    async def search_memories(query: str = Field(..., description="Fulltext search query to find entities by name, type, or observations")) -> ToolResult:
-        """Search for entities in the knowledge graph using fulltext search.
+    async def search_memories(query: str = Field(..., description="Hybrid search query (Vector + Fulltext)"),
+                              top_k: int = Field(5, description="Number of entities to return (5 for speed, 25 for depth)"),
+                              include_hop: bool = Field(False, description="Whether to include 1-hop relationships (increases token usage)")) -> ToolResult:
+        """Search for entities in the knowledge graph using Hybrid Search (Vector + Fulltext).
         
-        Searches across entity names, types, and observations using Neo4j's fulltext index.
-        Returns matching entities and their related connections. Supports partial matches
-        and multiple search terms.
+        This tool combines semantic vector similarity with traditional keyword matching across
+        names, types, and observations. 
+        
+        Scoping:
+        - top_k=5, include_hop=False: High-speed discovery, minimal tokens.
+        - top_k=25, include_hop=True: Deep research, full neighborhood context.
         
         Returns:
             KnowledgeGraph: Subgraph containing matching entities and their relationships
-            
-        Example call:
-        {
-            "query": "engineer software"
-        }
-        
-        This searches for entities containing "engineer" or "software" in their name, type, or observations.
         """
-        logger.info(f"MCP tool: search_memories ('{query}')")
+        logger.info(f"MCP tool: search_memories ('{query}', top_k={top_k}, hop={include_hop})")
         try:
-            result = await memory.search_memories(query)
+            result = await memory.search_memories(query, top_k=top_k, include_hop=include_hop)
             return ToolResult(content=[TextContent(type="text", text=result.model_dump_json())],
                               structured_content=result)
         except Neo4jError as e:
@@ -404,6 +406,131 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             logger.error(f"Error finding memories by name: {e}")
             raise ToolError(f"Error finding memories by name: {e}")
 
+    @mcp.tool(
+        name=namespace_prefix + "rebalance_graph",
+        annotations=ToolAnnotations(title="Rebalance Graph", 
+                                          readOnlyHint=False, 
+                                          destructiveHint=False, 
+                                          idempotentHint=True, 
+                                          openWorldHint=True))
+    async def rebalance_graph() -> ToolResult:
+        """Recalculate impact scores for all entities in the graph.
+        
+        Uses the Cognitive Impact Scoring (CIS) formula:
+        CIS = (utility * log10(frequency + 1)) * exp(-lambda * age)
+        
+        This tool should be run periodically (e.g., during the Janitor cycle) 
+        to ensure memory priority reflects recent activity and time decay.
+        
+        Returns:
+            str: Summary of the rebalancing operation
+        """
+        logger.info("MCP tool: rebalance_graph")
+        try:
+            count = await memory.rebalance_graph()
+            return ToolResult(content=[TextContent(type="text", text=f"Successfully rebalanced {count} entities.")],
+                              structured_content={"count": count})
+        except Neo4jError as e:
+            logger.error(f"Neo4j error rebalancing graph: {e}")
+            raise ToolError(f"Neo4j error rebalancing graph: {e}")
+        except Exception as e:
+            logger.error(f"Error rebalancing graph: {e}")
+            raise ToolError(f"Error rebalancing graph: {e}")
+
+    @mcp.tool(
+        name=namespace_prefix + "sync_labels",
+        annotations=ToolAnnotations(title="Sync Labels", 
+                                          readOnlyHint=False, 
+                                          destructiveHint=False, 
+                                          idempotentHint=True, 
+                                          openWorldHint=True))
+    async def sync_labels() -> ToolResult:
+        """One-time migration to ensure all entities have labels matching their 'type' property.
+        
+        This is required for the tiered decay model to function correctly, as it relies on 
+        Neo4j node labels (e.g., :Project, :Task) for heuristic weighting.
+        
+        Returns:
+            str: Summary of the sync operation
+        """
+        logger.info("MCP tool: sync_labels")
+        try:
+            count = await memory.sync_labels()
+            return ToolResult(content=[TextContent(type="text", text=f"Successfully synced labels for {count} entities.")],
+                              structured_content={"count": count})
+        except Neo4jError as e:
+            logger.error(f"Neo4j error syncing labels: {e}")
+            raise ToolError(f"Neo4j error syncing labels: {e}")
+        except Exception as e:
+            logger.error(f"Error syncing labels: {e}")
+            raise ToolError(f"Error syncing labels: {e}")
+
+    @mcp.tool(
+        name=namespace_prefix + "cognify_domain",
+        annotations=ToolAnnotations(title="Cognify Domain", 
+                                          readOnlyHint=False, 
+                                          destructiveHint=False, 
+                                          idempotentHint=True, 
+                                          openWorldHint=True))
+    async def cognify_domain(node_set: str = Field(..., description="The Node Set (Memory Domain) to summarize"), 
+                             summary: str = Field(..., description="The summary text for this domain's history"), 
+                             entityName: str = Field(None, description="Optional: Filter summarization to a specific entity"),
+                             asserted_by: str = Field("System", description="The Persona asserting the summary")) -> ToolResult:
+        """Simplified 'Cognify' step: Summarize a domain's history and supersede existing logs.
+        
+        This tool creates a single summary observation that SUPERSEDES all current leaf 
+        observations in the specified node_set (optionally filtered by entity). Use this
+        to compress long observation histories into high-density summaries.
+        
+        Returns:
+            dict: Status and whether a summary was created
+            
+        Example call:
+        {
+            "node_set": "Katiskankatu",
+            "summary": "Project Katiskankatu is currently in the planning phase. Major milestones include...",
+            "entityName": "Taloprojekti Katiskankatu 21"
+        }
+        """
+        logger.info(f"MCP tool: cognify_domain (node_set={node_set}, entity={entityName})")
+        try:
+            result = await memory.cognify_domain(node_set, summary, entityName, asserted_by)
+            return ToolResult(content=[TextContent(type="text", text=json.dumps(result))],
+                          structured_content=result)
+        except Neo4jError as e:
+            logger.error(f"Neo4j error during cognify: {e}")
+            raise ToolError(f"Neo4j error during cognify: {e}")
+        except Exception as e:
+            logger.error(f"Error during cognify: {e}")
+            raise ToolError(f"Error during cognify: {e}")
+
+    @mcp.tool(
+        name=namespace_prefix + "vectorize_entities",
+        annotations=ToolAnnotations(title="Vectorize Entities", 
+                                          readOnlyHint=False, 
+                                          destructiveHint=False, 
+                                          idempotentHint=True, 
+                                          openWorldHint=True))
+    async def vectorize_entities(names: list[str] = Field(None, description="Optional: List of exact entity names to vectorize"),
+                                 limit: int = Field(100, description="Optional: Maximum number of entities to process if names not provided")) -> ToolResult:
+        """Connect a production-ready vectorization engine to generate embeddings for Neo4j entities.
+        
+        This tool generates semantic embeddings for entities using the configured VectorEngine 
+        (e.g., Gemini or Ollama). It combines the entity name, type, and all active observations 
+        to create a high-density semantic representation.
+        
+        Returns:
+            str: Summary of the vectorization operation
+        """
+        logger.info(f"MCP tool: vectorize_entities (names={names}, limit={limit})")
+        try:
+            count = await memory.vectorize_entities(names=names, limit=limit)
+            return ToolResult(content=[TextContent(type="text", text=f"Successfully vectorized {count} entities.")],
+                          structured_content={"count": count})
+        except Exception as e:
+            logger.error(f"Error during vectorization: {e}")
+            raise ToolError(f"Error during vectorization: {e}")
+
     return mcp
 
 
@@ -412,6 +539,9 @@ async def main(
     neo4j_user: str,
     neo4j_password: str,
     neo4j_database: str,
+    gemini_api_key: Optional[str] = None,
+    ollama_base_url: Optional[str] = None,
+    ollama_model: str = "nomic-embed-text",
     transport: Literal["stdio", "sse", "http"] = "stdio",
     namespace: str = "",
     host: str = "127.0.0.1",
@@ -438,8 +568,17 @@ async def main(
         logger.error(f"Failed to connect to Neo4j: {e}")
         exit(1)
 
+    # Initialize vector engine
+    vector_engine = None
+    if gemini_api_key:
+        vector_engine = GeminiVectorEngine(gemini_api_key)
+        logger.info("GeminiVectorEngine initialized")
+    elif ollama_base_url:
+        vector_engine = OllamaVectorEngine(ollama_base_url, ollama_model)
+        logger.info(f"OllamaVectorEngine initialized ({ollama_model})")
+
     # Initialize memory
-    memory = Neo4jMemory(neo4j_driver)
+    memory = Neo4jMemory(neo4j_driver, vector_engine)
     logger.info("Neo4jMemory initialized")
     
     # Create fulltext index
@@ -469,7 +608,7 @@ async def main(
             await mcp.run_http_async(host=host, port=port, path=path, middleware=custom_middleware)
         case "stdio":
             logger.info("STDIO server starting")
-            await mcp.run_stdio_async()
+            await mcp.run_stdio_async(show_banner=False)
         case "sse":
             logger.info(f"SSE server starting on {host}:{port}{path}")
             await mcp.run_http_async(host=host, port=port, path=path, middleware=custom_middleware, transport="sse")
