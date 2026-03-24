@@ -174,25 +174,29 @@ def create_mcp_server(
             raise ToolError(f"Unexpected Error: {e}")
 
     @mcp.tool(
-        name=namespace_prefix + "read_neo4j_cypher",
+        name=namespace_prefix + "query_neo4j_memory",
         annotations=ToolAnnotations(
-            title="Read Neo4j Cypher",
+            title="Query Neo4j Memory",
             readOnlyHint=True,
             destructiveHint=False,
             idempotentHint=True,
             openWorldHint=True,
         ),
     )
-    async def read_neo4j_cypher(
-        query: str = Field(..., description="The Cypher query to execute."),
+    async def query_neo4j_memory(
+        query: str = Field(..., description="The Cypher query to execute. Must include 'LIMIT X'."),
         params: dict[str, Any] = Field(
             dict(), description="The parameters to pass to the Cypher query."
         ),
     ) -> list[ToolResult]:
-        """Execute a read Cypher query on the neo4j database."""
+        """Executes a Cypher query against the Neo4j knowledge graph. CRITICAL RULE: Every single query MUST end with a LIMIT clause (e.g., LIMIT 5 or LIMIT 10) to prevent context overflow. Only request the specific properties needed, do not return entire nodes unless necessary."""
 
         if _is_write_query(query):
             raise ValueError("Only MATCH queries are allowed for read-query")
+
+        # Basic enforcement of LIMIT clause
+        if "LIMIT" not in query.upper():
+            raise ValueError("CRITICAL RULE VIOLATION: Every Cypher query MUST end with a LIMIT clause (e.g., LIMIT 5).")
 
         try:
             query_obj = Query(query, timeout=float(read_timeout))
