@@ -203,16 +203,40 @@ class Neo4jMemory:
         self.vector_engine = vector_engine
 
     async def create_fulltext_index(self):
-        """Create fulltext search indices for entities and observations if they don't exist."""
+        """Create search indices for entities and observations if they don't exist."""
         try:
+            # 1. Fulltext Indices
             query_entity = "CREATE FULLTEXT INDEX search_entity IF NOT EXISTS FOR (e:Entity) ON EACH [e.name, e.type];"
             await self.driver.execute_query(query_entity, routing_control=RoutingControl.WRITE)
             query_obs = "CREATE FULLTEXT INDEX search_obs IF NOT EXISTS FOR (o:Observation) ON EACH [o.content];"
             await self.driver.execute_query(query_obs, routing_control=RoutingControl.WRITE)
-            logger.info("Created fulltext search indices")
+            
+            # 2. Vector Indices (assuming 3072 dimensions for text-embedding-004)
+            # Entity Vector Index
+            query_vector_entity = """
+            CREATE VECTOR INDEX entity_vector_index IF NOT EXISTS
+            FOR (e:Entity) ON (e.embedding)
+            OPTIONS {indexConfig: {
+             `vector.dimensions`: 3072,
+             `vector.similarity_function`: 'cosine'
+            }}
+            """
+            await self.driver.execute_query(query_vector_entity, routing_control=RoutingControl.WRITE)
+            
+            # Observation Vector Index
+            query_vector_obs = """
+            CREATE VECTOR INDEX obs_vector_index IF NOT EXISTS
+            FOR (o:Observation) ON (o.embedding)
+            OPTIONS {indexConfig: {
+             `vector.dimensions`: 3072,
+             `vector.similarity_function`: 'cosine'
+            }}
+            """
+            await self.driver.execute_query(query_vector_obs, routing_control=RoutingControl.WRITE)
+            
+            logger.info("Created search indices (Fulltext + Vector)")
         except Exception as e:
-            # Index might already exist, which is fine
-            logger.debug(f"Fulltext index creation: {e}")
+            logger.debug(f"Index creation error: {e}")
 
     async def load_graph(self, filter_query: str = "*"):
         """Load the entire knowledge graph from Neo4j."""
@@ -745,7 +769,7 @@ class Neo4jMemory:
             logger.warning("Failed to generate embedding for query, falling back to fulltext.")
             return await self.load_graph(query)
 
-        # 2. Execute Hybrid Cypher Query with Scoping
+        # 2. Execute V6 Hybrid Cypher Query with Scoping
         # include_hop=True triggers a 1-hop traversal to fetch relations
         cypher = f"""
         CALL {{
@@ -755,13 +779,20 @@ class Neo4jMemory:
             
             UNION
             
-            // B. Fulltext Search on Entity Metadata
+            // B. Vector Search on Observation Embeddings (V6 Feature)
+            CALL db.index.vector.queryNodes('obs_vector_index', $limit, $embedding) YIELD node as obs, score
+            MATCH (obs)-[:OBSERVES_STATE]->(entity:Entity)
+            RETURN entity, score
+            
+            UNION
+            
+            // C. Fulltext Search on Entity Metadata
             CALL db.index.fulltext.queryNodes('search_entity', $query) YIELD node as entity, score
             RETURN entity, score
             
             UNION
             
-            // C. Fulltext Search on Observations (returning their parent entities)
+            // D. Fulltext Search on Observations (returning their parent entities)
             CALL db.index.fulltext.queryNodes('search_obs', $query) YIELD node as obs, score
             MATCH (obs)-[:OBSERVES_STATE]->(entity:Entity)
             RETURN entity, score
@@ -774,15 +805,23 @@ class Neo4jMemory:
         SET entity.frequency = coalesce(entity.frequency, 0) + 1,
             entity.last_accessed = toString(datetime())
         
-        WITH entity
+        WITH entity, combined_score
             
-        // Gather Observations for the results
+        // Gather Semantically Relevant Observations (Phase 4: Cognitive Pruning)
+        // We match all observations but rank them by their own embedding similarity if available
         OPTIONAL MATCH (o:Observation)-[:OBSERVES_STATE]->(entity)
         WHERE o.is_deleted IS NULL OR o.is_deleted = false
-        WITH entity, collect(distinct o.content) as obs
+        WITH entity, o, combined_score,
+             CASE 
+                WHEN o.embedding IS NOT NULL THEN 
+                    vector.similarity.cosine(o.embedding, $embedding)
+                ELSE 0.0 
+             END AS obs_score
+        ORDER BY obs_score DESC
+        // Limit to top 15 most relevant observations per entity to keep context lean
+        WITH entity, collect(o.content)[0..15] as obs, combined_score
         
         // Traversal: Conditional 1-hop relations
-        // If include_hop is false, r will be null
         OPTIONAL MATCH (entity)-[r]-(other:Entity)
         WHERE $include_hop = true
         
@@ -915,47 +954,76 @@ class Neo4jMemory:
         return KnowledgeGraph(entities=entities, relations=relations)
 
     async def vectorize_entities(self, names: Optional[List[str]] = None, limit: int = 100) -> int:
-        """Bulk update embeddings for entities lacking them, or for specific named entities."""
+        """Bulk update embeddings for Observations lacking them. 
+        If names provided, limits to observations of those entities."""
         if not self.vector_engine:
             logger.warning("Vectorization requested but no VectorEngine configured.")
             return 0
             
-        logger.info(f"Vectorizing entities (names={names}, limit={limit})")
+        logger.info(f"Vectorizing observations (entity_names={names}, limit={limit})")
         
         if names:
-            query = "MATCH (e:Entity) WHERE e.name IN $names RETURN e.name AS name, e.type AS type"
-            params = {"names": names}
+            query = """
+            MATCH (e:Entity)<-[:OBSERVES_STATE]-(o:Observation) 
+            WHERE e.name IN $names AND o.embedding IS NULL
+            RETURN o.content AS content, id(o) AS obs_id, e.name AS entity_name
+            LIMIT $limit
+            """
+            params = {"names": names, "limit": limit}
         else:
-            query = "MATCH (e:Entity) WHERE e.embedding IS NULL RETURN e.name AS name, e.type AS type LIMIT $limit"
+            query = """
+            MATCH (e:Entity)<-[:OBSERVES_STATE]-(o:Observation)
+            WHERE o.embedding IS NULL 
+            RETURN o.content AS content, id(o) AS obs_id, e.name AS entity_name
+            LIMIT $limit
+            """
             params = {"limit": limit}
             
         result = await self.driver.execute_query(query, params, routing_control=RoutingControl.READ)
-        entities = [{"name": record["name"], "type": record["type"]} for record in result.records]
+        observations = [{"content": record["content"], "id": record["obs_id"], "entity": record["entity_name"]} for record in result.records]
+        
+        logger.info(f"Found {len(observations)} observations to vectorize.")
         
         updated_count = 0
-        for ent in entities:
+        affected_entities = set()
+        for obs in observations:
             try:
-                # 1. Gather context for embedding
-                text_to_embed = f"Entity: {ent['name']}, Type: {ent['type']}"
-                obs_query = "MATCH (e:Entity {name: $name})<-[:OBSERVES_STATE]-(o:Observation) RETURN o.content AS obs"
-                obs_res = await self.driver.execute_query(obs_query, {"name": ent['name']}, routing_control=RoutingControl.READ)
-                observations = [rec["obs"] for rec in obs_res.records]
-                if observations:
-                    text_to_embed += " Observations: " + " ".join(observations)
-                
-                # 2. Call VectorEngine
-                emb = await self.vector_engine.get_embedding(text_to_embed)
+                # 1. Call VectorEngine for the specific observation
+                emb = await self.vector_engine.get_embedding(obs["content"])
                 if emb:
-                    update_query = "MATCH (e:Entity {name: $name}) SET e.embedding = $emb"
-                    await self.driver.execute_query(update_query, {"name": ent['name'], "emb": emb}, routing_control=RoutingControl.WRITE)
+                    update_query = "MATCH (o:Observation) WHERE id(o) = $id SET o.embedding = $emb"
+                    await self.driver.execute_query(update_query, {"id": obs["id"], "emb": emb}, routing_control=RoutingControl.WRITE)
                     updated_count += 1
+                    affected_entities.add(obs["entity"])
             except Exception as e:
-                logger.error(f"Error vectorizing entity '{ent['name']}': {e}")
+                logger.error(f"Error vectorizing observation '{obs['id']}': {e}")
+        
+        # 2. Update centroids for affected entities (Phase 3 precursor)
+        for ent_name in affected_entities:
+            await self._update_entity_centroid(ent_name)
                 
-        logger.info(f"Successfully vectorized {updated_count} entities.")
+        logger.info(f"Successfully vectorized {updated_count} observations across {len(affected_entities)} entities.")
         return updated_count
 
+    async def _update_entity_centroid(self, entity_name: str):
+        """Calculates and updates the Entity's embedding as a weighted centroid of its observations."""
+        query = """
+        MATCH (e:Entity {name: $name})<-[:OBSERVES_STATE]-(o:Observation)
+        WHERE o.embedding IS NOT NULL
+        WITH e, collect(o.embedding) AS embeddings
+        // Simple average for now (centroid). Phase 3 will add weighting via impact_score.
+        WITH e, [i IN range(0, size(embeddings[0])-1) | 
+                 reduce(acc = 0.0, emb IN embeddings | acc + emb[i]) / size(embeddings)] AS centroid
+        SET e.embedding = centroid
+        RETURN e.name
+        """
+        try:
+            await self.driver.execute_query(query, {"name": entity_name}, routing_control=RoutingControl.WRITE)
+        except Exception as e:
+            logger.error(f"Failed to update centroid for '{entity_name}': {e}")
+
     async def _auto_vectorize(self, entity_name: str):
-        """Internal helper for event-driven vectorization."""
+        """Internal helper for event-driven vectorization. Targets new observations of an entity."""
         if self.vector_engine:
-            await self.vectorize_entities(names=[entity_name])
+            # We vectorize all pending observations for this entity
+            await self.vectorize_entities(names=[entity_name], limit=50)

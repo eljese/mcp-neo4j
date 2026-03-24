@@ -187,5 +187,10 @@ def process_config(args: argparse.Namespace) -> dict[str, Union[str, int, None]]
         else:
             logger.info("Info: No namespace provided for tools. No namespace will be used.")
             config["namespace"] = ""
-    
-    return config
+
+        # parse gemini api key
+        if os.getenv("GEMINI_API_KEY") is not None:
+            config["gemini_api_key"] = os.getenv("GEMINI_API_KEY")
+
+        return config
+

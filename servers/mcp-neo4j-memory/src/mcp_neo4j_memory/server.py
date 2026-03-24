@@ -525,7 +525,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         logger.info(f"MCP tool: vectorize_entities (names={names}, limit={limit})")
         try:
             count = await memory.vectorize_entities(names=names, limit=limit)
-            return ToolResult(content=[TextContent(type="text", text=f"Successfully vectorized {count} entities.")],
+            return ToolResult(content=[TextContent(type="text", text=f"Successfully vectorized {count} observations.")],
                           structured_content={"count": count})
         except Exception as e:
             logger.error(f"Error during vectorization: {e}")
