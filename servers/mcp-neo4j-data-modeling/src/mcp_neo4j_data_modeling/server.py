@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 from fastmcp.server import FastMCP
 from mcp.types import ToolAnnotations
@@ -121,7 +121,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
         ),
     )
     def validate_node(
-        node: Union[str, Node], return_validated: bool = False
+        node: str | Node, return_validated: bool = False
     ) -> bool | dict[str, Any]:
         """
         Validate a single node.
@@ -154,7 +154,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
         ),
     )
     def validate_relationship(
-        relationship: Union[str, Relationship], return_validated: bool = False
+        relationship: str | Relationship, return_validated: bool = False
     ) -> bool | dict[str, Any]:
         """
         Validate a single relationship.
@@ -189,7 +189,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
         ),
     )
     def validate_data_model(
-        data_model: Union[str, DataModel], return_validated: bool = False
+        data_model: str | DataModel, return_validated: bool = False
     ) -> bool | dict[str, Any]:
         """
         Validate the entire data model.
@@ -236,7 +236,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
             openWorldHint=False,
         ),
     )
-    def export_to_arrows_json(data_model: Union[str, DataModel]) -> str:
+    def export_to_arrows_json(data_model: str | DataModel) -> str:
         """
         Export the data model to the Arrows web application format.
         Returns a JSON string. This should be presented to the user as an artifact if possible.
@@ -258,7 +258,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
             openWorldHint=False,
         ),
     )
-    def get_mermaid_config_str(data_model: Union[str, DataModel]) -> str:
+    def get_mermaid_config_str(data_model: str | DataModel) -> str:
         """
         Get the Mermaid configuration string for the data model.
         This may be visualized in Claude Desktop and other applications with Mermaid support.
@@ -285,7 +285,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
         ),
     )
     def get_node_cypher_ingest_query(
-        node: Union[str, Node] = Field(
+        node: str | Node = Field(
             description="The node to get the Cypher query for. Accepts either a Node object or a JSON string of the Node object."
         ),
     ) -> str:
@@ -313,7 +313,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
         ),
     )
     def get_relationship_cypher_ingest_query(
-        data_model: Union[str, DataModel] = Field(
+        data_model: str | DataModel = Field(
             description="The data model snippet that contains the relationship, start node and end node. Accepts either a DataModel object or a JSON string of the DataModel object."
         ),
         relationship_type: str = Field(
@@ -354,7 +354,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
             openWorldHint=False,
         ),
     )
-    def get_constraints_cypher_queries(data_model: Union[str, DataModel]) -> list[str]:
+    def get_constraints_cypher_queries(data_model: str | DataModel) -> list[str]:
         """
         Get the Cypher queries to create constraints on the data model.
         This creates range indexes on the key properties of the nodes and relationships and enforces uniqueness and existence of the key properties.
@@ -505,7 +505,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
             openWorldHint=False,
         ),
     )
-    def export_to_owl_turtle(data_model: Union[str, DataModel]) -> str:
+    def export_to_owl_turtle(data_model: str | DataModel) -> str:
         """
         Export a data model to an OWL Turtle string.
         This process is lossy since OWL does not support properties on relationships.
@@ -528,7 +528,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
             openWorldHint=False,
         ),
     )
-    def export_to_pydantic_models(data_model: Union[str, DataModel]) -> str:
+    def export_to_pydantic_models(data_model: str | DataModel) -> str:
         """
         Export a data model to Pydantic models.
         Returns a string representation of the Pydantic models for the data model as a Python file.
@@ -551,7 +551,7 @@ def create_mcp_server(namespace: str = "") -> FastMCP:
         ),
     )
     def export_to_neo4j_graphrag_pkg_schema(
-        data_model: Union[str, DataModel],
+        data_model: str | DataModel,
     ) -> dict[str, Any]:
         """
         Export a data model to a Neo4j Graphrag Python Package schema.
@@ -642,7 +642,7 @@ Additional Instructions:
 
 Process:
 1. Analysis
-    1a. Analyze the sample data 
+    1a. Analyze the sample data
     1b. Use the `list_example_data_models` tool to check if there are any relevant examples that you can use to guide your data model
     1c. Use the `get_example_data_model` tool to get any relevant example data models
 2. Generation
@@ -650,7 +650,7 @@ Process:
     2b. Use the `get_mermaid_config_str` tool to validate the data model and get a Mermaid visualization configuration
     2c. If necessary, correct any validation errors and repeat step 2b
 3. Final Response
-    3a. Show the user the visualization with Mermaid, if possible 
+    3a. Show the user the visualization with Mermaid, if possible
     3b. Explain the data model and any gaps between the requested use cases
     3c. Request feedback from the user (remember that data modeling is an iterative process)
 """
@@ -666,9 +666,13 @@ async def main(
     host: str = "127.0.0.1",
     port: int = 8000,
     path: str = "/mcp/",
-    allow_origins: list[str] = [],
-    allowed_hosts: list[str] = [],
+    allow_origins: list[str] = None,
+    allowed_hosts: list[str] = None,
 ) -> None:
+    if allowed_hosts is None:
+        allowed_hosts = []
+    if allow_origins is None:
+        allow_origins = []
     logger.info("Starting MCP Neo4j Data Modeling Server")
 
     custom_middleware = [

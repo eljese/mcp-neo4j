@@ -8,7 +8,6 @@ import tempfile
 from pathlib import Path
 
 import pytest
-
 from mcp_neo4j_data_modeling.data_model import DataModel, Node, Property, Relationship
 
 

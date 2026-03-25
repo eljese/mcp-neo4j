@@ -5,7 +5,6 @@ import aiohttp
 import pytest
 
 
-
 async def parse_sse_response(response: aiohttp.ClientResponse) -> dict:
     """Parse Server-Sent Events response from FastMCP 2.0."""
     content = await response.text()
@@ -94,7 +93,7 @@ async def test_http_create_entities(http_server):
                             {
                                 "name": "http_test_entity",
                                 "entityType": "Person",
-                                "observations": ["Test observation"]
+                                "observations": ["Test observation"],
                             }
                         ]
                     },
@@ -218,7 +217,7 @@ async def test_http_full_workflow(http_server):
                             {
                                 "name": "workflow_test_entity",
                                 "entityType": "Person",
-                                "observations": ["Integration test observation"]
+                                "observations": ["Integration test observation"],
                             }
                         ]
                     },
@@ -461,7 +460,9 @@ async def test_dns_rebinding_protection_trusted_hosts(http_server):
             },
         ) as response:
             print(f"Trusted host (localhost) response status: {response.status}")
-            print(f"Trusted host (localhost) response headers: {dict(response.headers)}")
+            print(
+                f"Trusted host (localhost) response headers: {dict(response.headers)}"
+            )
 
             # Should work with trusted host
             assert response.status == 200
@@ -509,7 +510,9 @@ async def test_dns_rebinding_custom_allowed_hosts(http_server_custom_hosts):
                 "mcp-session-id": session_id,
             },
         ) as response:
-            print(f"Custom allowed host (example.com) response status: {response.status}")
+            print(
+                f"Custom allowed host (example.com) response status: {response.status}"
+            )
             print(f"Custom allowed host response headers: {dict(response.headers)}")
 
             # Should work with custom allowed host
@@ -529,7 +532,9 @@ async def test_dns_rebinding_custom_allowed_hosts(http_server_custom_hosts):
                 "mcp-session-id": session_id,
             },
         ) as response:
-            print(f"Custom allowed host (test.local:8004) response status: {response.status}")
+            print(
+                f"Custom allowed host (test.local:8004) response status: {response.status}"
+            )
             print(f"Custom allowed host response headers: {dict(response.headers)}")
 
             # Should work with custom allowed host
@@ -549,7 +554,9 @@ async def test_dns_rebinding_custom_allowed_hosts(http_server_custom_hosts):
                 "mcp-session-id": session_id,
             },
         ) as response:
-            print(f"Localhost (not in custom allowed) response status: {response.status}")
+            print(
+                f"Localhost (not in custom allowed) response status: {response.status}"
+            )
             print(f"Localhost response headers: {dict(response.headers)}")
 
             # Should block localhost when not in custom allowed hosts

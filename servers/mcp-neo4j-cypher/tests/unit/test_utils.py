@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 import pytest
 import tiktoken
-
 from mcp_neo4j_cypher.utils import (
     _truncate_string_to_tokens,
     parse_boolean_safely,
@@ -209,7 +208,7 @@ def test_default_values_with_warnings(
         assert config[key] == expected_value
 
     # Check that warnings were logged
-    warning_calls = [call for call in mock_logger.warning.call_args_list]
+    warning_calls = list(mock_logger.warning.call_args_list)
     assert (
         len(warning_calls) == 5
     )  # 5 warnings: neo4j uri, user, password, database, transport
@@ -777,7 +776,7 @@ def test_sample_invalid_env_var(clean_env, args_factory, mock_logger):
     """Test sample with invalid environment variable value."""
     os.environ["NEO4J_SCHEMA_SAMPLE_SIZE"] = "not_a_number"
     config = process_config(args_factory())
-    
+
     # Should default to None and log warning
     assert config["sa"] is None
     mock_logger.warning.assert_called_with(

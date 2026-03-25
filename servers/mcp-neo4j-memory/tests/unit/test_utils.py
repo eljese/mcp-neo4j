@@ -1,8 +1,8 @@
 import argparse
 import os
 from unittest.mock import patch
-import pytest
 
+import pytest
 from mcp_neo4j_memory.utils import process_config
 
 
@@ -10,11 +10,18 @@ from mcp_neo4j_memory.utils import process_config
 def clean_env():
     """Fixture to clean environment variables before each test."""
     env_vars = [
-        "NEO4J_URL", "NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD",
-        "NEO4J_DATABASE", "NEO4J_TRANSPORT", "NEO4J_MCP_SERVER_HOST",
-        "NEO4J_MCP_SERVER_PORT", "NEO4J_MCP_SERVER_PATH",
-        "NEO4J_MCP_SERVER_ALLOW_ORIGINS", "NEO4J_MCP_SERVER_ALLOWED_HOSTS",
-        "NEO4J_NAMESPACE"
+        "NEO4J_URL",
+        "NEO4J_URI",
+        "NEO4J_USERNAME",
+        "NEO4J_PASSWORD",
+        "NEO4J_DATABASE",
+        "NEO4J_TRANSPORT",
+        "NEO4J_MCP_SERVER_HOST",
+        "NEO4J_MCP_SERVER_PORT",
+        "NEO4J_MCP_SERVER_PATH",
+        "NEO4J_MCP_SERVER_ALLOW_ORIGINS",
+        "NEO4J_MCP_SERVER_ALLOWED_HOSTS",
+        "NEO4J_NAMESPACE",
     ]
     # Store original values
     original_values = {}
@@ -22,9 +29,9 @@ def clean_env():
         if var in os.environ:
             original_values[var] = os.environ[var]
             del os.environ[var]
-    
+
     yield
-    
+
     # Restore original values
     for var, value in original_values.items():
         os.environ[var] = value
@@ -33,6 +40,7 @@ def clean_env():
 @pytest.fixture
 def args_factory():
     """Factory fixture to create argparse.Namespace objects with default None values."""
+
     def _create_args(**kwargs):
         defaults = {
             "db_url": None,
@@ -49,13 +57,14 @@ def args_factory():
         }
         defaults.update(kwargs)
         return argparse.Namespace(**defaults)
+
     return _create_args
 
 
 @pytest.fixture
 def mock_logger():
     """Fixture to provide a mocked logger."""
-    with patch('mcp_neo4j_memory.utils.logger') as mock:
+    with patch("mcp_neo4j_memory.utils.logger") as mock:
         yield mock
 
 
@@ -72,7 +81,7 @@ def sample_cli_args(args_factory):
         server_port=9000,
         server_path="/test/",
         allow_origins="http://localhost:3000,https://trusted-site.com",
-        allowed_hosts="localhost,127.0.0.1,example.com"
+        allowed_hosts="localhost,127.0.0.1,example.com",
     )
 
 
@@ -89,7 +98,7 @@ def sample_env_vars():
         "NEO4J_MCP_SERVER_PORT": "8080",
         "NEO4J_MCP_SERVER_PATH": "/env/",
         "NEO4J_MCP_SERVER_ALLOW_ORIGINS": "http://env-site.com,https://env-secure.com",
-        "NEO4J_MCP_SERVER_ALLOWED_HOSTS": "envhost.com,api.envhost.com"
+        "NEO4J_MCP_SERVER_ALLOWED_HOSTS": "envhost.com,api.envhost.com",
     }
 
 
@@ -131,7 +140,10 @@ def test_all_cli_args_provided(clean_env, sample_cli_args):
     assert config["host"] == "localhost"
     assert config["port"] == 9000
     assert config["path"] == "/test/"
-    assert config["allow_origins"] == ["http://localhost:3000", "https://trusted-site.com"]
+    assert config["allow_origins"] == [
+        "http://localhost:3000",
+        "https://trusted-site.com",
+    ]
     assert config["allowed_hosts"] == ["localhost", "127.0.0.1", "example.com"]
 
 
@@ -156,14 +168,11 @@ def test_cli_args_override_env_vars(clean_env, args_factory):
     """Test that CLI arguments take precedence over environment variables."""
     os.environ["NEO4J_URL"] = "bolt://env:7687"
     os.environ["NEO4J_USERNAME"] = "envuser"
-    
-    args = args_factory(
-        db_url="bolt://cli:7687",
-        username="cliuser"
-    )
-    
+
+    args = args_factory(db_url="bolt://cli:7687", username="cliuser")
+
     config = process_config(args)
-    
+
     assert config["neo4j_uri"] == "bolt://cli:7687"
     assert config["neo4j_user"] == "cliuser"
 
@@ -171,24 +180,28 @@ def test_cli_args_override_env_vars(clean_env, args_factory):
 def test_neo4j_uri_fallback(clean_env, args_factory):
     """Test NEO4J_URI fallback when NEO4J_URL is not set."""
     os.environ["NEO4J_URI"] = "bolt://uri:7687"
-    
+
     args = args_factory()
     config = process_config(args)
-    
+
     assert config["neo4j_uri"] == "bolt://uri:7687"
 
 
-def test_default_values_with_warnings(clean_env, args_factory, expected_defaults, mock_logger):
+def test_default_values_with_warnings(
+    clean_env, args_factory, expected_defaults, mock_logger
+):
     """Test default values are used and warnings are logged when nothing is provided."""
     args = args_factory()
     config = process_config(args)
-    
+
     for key, expected_value in expected_defaults.items():
         assert config[key] == expected_value
-    
+
     # Check that warnings were logged
-    warning_calls = [call for call in mock_logger.warning.call_args_list]
-    assert len(warning_calls) == 5  # 5 warnings: neo4j uri, user, password, database, transport
+    warning_calls = list(mock_logger.warning.call_args_list)
+    assert (
+        len(warning_calls) == 5
+    )  # 5 warnings: neo4j uri, user, password, database, transport
 
 
 def test_stdio_transport_ignores_server_config(clean_env, args_factory, mock_logger):
@@ -197,19 +210,21 @@ def test_stdio_transport_ignores_server_config(clean_env, args_factory, mock_log
         transport="stdio",
         server_host="localhost",
         server_port=8000,
-        server_path="/test/"
+        server_path="/test/",
     )
-    
+
     config = process_config(args)
-    
+
     assert config["transport"] == "stdio"
     assert config["host"] == "localhost"  # Set but ignored
     assert config["port"] == 8000  # Set but ignored
     assert config["path"] == "/test/"  # Set but ignored
-    
+
     # Check that warnings were logged for ignored server config
     warning_calls = [call.args[0] for call in mock_logger.warning.call_args_list]
-    stdio_warnings = [msg for msg in warning_calls if "stdio" in msg and "ignored" in msg]
+    stdio_warnings = [
+        msg for msg in warning_calls if "stdio" in msg and "ignored" in msg
+    ]
     assert len(stdio_warnings) == 3  # host, port, path warnings
 
 
@@ -219,18 +234,20 @@ def test_stdio_transport_env_vars_ignored(clean_env, args_factory, mock_logger):
     os.environ["NEO4J_MCP_SERVER_HOST"] = "envhost"
     os.environ["NEO4J_MCP_SERVER_PORT"] = "9000"
     os.environ["NEO4J_MCP_SERVER_PATH"] = "/envpath/"
-    
+
     args = args_factory()
     config = process_config(args)
-    
+
     assert config["transport"] == "stdio"
     assert config["host"] == "envhost"  # Set but ignored
     assert config["port"] == 9000  # Set but ignored
     assert config["path"] == "/envpath/"  # Set but ignored
-    
+
     # Check that warnings were logged for ignored env vars
     warning_calls = [call.args[0] for call in mock_logger.warning.call_args_list]
-    stdio_warnings = [msg for msg in warning_calls if "stdio" in msg and "environment variable" in msg]
+    stdio_warnings = [
+        msg for msg in warning_calls if "stdio" in msg and "environment variable" in msg
+    ]
     assert len(stdio_warnings) == 3
 
 
@@ -238,12 +255,12 @@ def test_non_stdio_transport_uses_defaults(clean_env, args_factory, mock_logger)
     """Test that non-stdio transport uses default server config when not provided."""
     args = args_factory(transport="http")
     config = process_config(args)
-    
+
     assert config["transport"] == "http"
     assert config["host"] == "127.0.0.1"
     assert config["port"] == 8000
     assert config["path"] == "/mcp/"
-    
+
     # Check that warnings were logged for using defaults
     warning_calls = [call.args[0] for call in mock_logger.warning.call_args_list]
     default_warnings = [msg for msg in warning_calls if "Using default" in msg]
@@ -253,19 +270,16 @@ def test_non_stdio_transport_uses_defaults(clean_env, args_factory, mock_logger)
 def test_non_stdio_transport_with_server_config(clean_env, args_factory, mock_logger):
     """Test that non-stdio transport uses provided server config without warnings."""
     args = args_factory(
-        transport="sse",
-        server_host="myhost",
-        server_port=9999,
-        server_path="/mypath/"
+        transport="sse", server_host="myhost", server_port=9999, server_path="/mypath/"
     )
-    
+
     config = process_config(args)
-    
+
     assert config["transport"] == "sse"
     assert config["host"] == "myhost"
     assert config["port"] == 9999
     assert config["path"] == "/mypath/"
-    
+
     # Should not have warnings about stdio transport
     warning_calls = [call.args[0] for call in mock_logger.warning.call_args_list]
     stdio_warnings = [msg for msg in warning_calls if "stdio" in msg]
@@ -276,40 +290,58 @@ def test_env_var_port_conversion(clean_env, args_factory, mock_logger):
     """Test that environment variable port is converted to int."""
     os.environ["NEO4J_MCP_SERVER_PORT"] = "8080"
     os.environ["NEO4J_TRANSPORT"] = "http"
-    
+
     args = args_factory()
     config = process_config(args)
-    
+
     assert config["port"] == 8080
     assert isinstance(config["port"], int)
 
 
-@pytest.mark.parametrize("transport,expected_host,expected_port,expected_path,expected_warning_count", [
-    ("stdio", None, None, None, 0),  # stdio with no server config
-    ("http", "127.0.0.1", 8000, "/mcp/", 3),  # http with defaults
-    ("sse", "127.0.0.1", 8000, "/mcp/", 3),   # sse with defaults
-])
-def test_mixed_transport_scenarios(clean_env, args_factory, mock_logger, transport, expected_host, expected_port, expected_path, expected_warning_count):
+@pytest.mark.parametrize(
+    "transport,expected_host,expected_port,expected_path,expected_warning_count",
+    [
+        ("stdio", None, None, None, 0),  # stdio with no server config
+        ("http", "127.0.0.1", 8000, "/mcp/", 3),  # http with defaults
+        ("sse", "127.0.0.1", 8000, "/mcp/", 3),  # sse with defaults
+    ],
+)
+def test_mixed_transport_scenarios(
+    clean_env,
+    args_factory,
+    mock_logger,
+    transport,
+    expected_host,
+    expected_port,
+    expected_path,
+    expected_warning_count,
+):
     """Test various combinations of transport with server config."""
     args = args_factory(transport=transport)
     config = process_config(args)
-    
+
     assert config["transport"] == transport
     assert config["host"] == expected_host
     assert config["port"] == expected_port
     assert config["path"] == expected_path
-    
+
     warning_calls = [call.args[0] for call in mock_logger.warning.call_args_list]
-    server_warnings = [msg for msg in warning_calls if any(
-        keyword in msg for keyword in ["server host", "server port", "server path"]
-    )]
-    assert len(server_warnings) == expected_warning_count, f"Transport {transport} warning count mismatch"
+    server_warnings = [
+        msg
+        for msg in warning_calls
+        if any(
+            keyword in msg for keyword in ["server host", "server port", "server path"]
+        )
+    ]
+    assert len(server_warnings) == expected_warning_count, (
+        f"Transport {transport} warning count mismatch"
+    )
 
 
 def test_info_logging_stdio_transport(clean_env, args_factory, mock_logger):
     """Test that info messages are logged for stdio transport when appropriate."""
     args = args_factory(transport="stdio")
-    config = process_config(args)
+    process_config(args)
 
     # Check for info messages about stdio transport
     info_calls = [call.args[0] for call in mock_logger.info.call_args_list]
@@ -420,9 +452,7 @@ def test_allowed_hosts_defaults(clean_env, args_factory, mock_logger):
     # Check that info message was logged about secure defaults
     info_calls = [call.args[0] for call in mock_logger.info.call_args_list]
     allowed_hosts_info = [
-        msg
-        for msg in info_calls
-        if "allowed hosts" in msg and "secure mode" in msg
+        msg for msg in info_calls if "allowed hosts" in msg and "secure mode" in msg
     ]
     assert len(allowed_hosts_info) == 1
 
@@ -466,7 +496,7 @@ class TestNamespaceConfigProcessing:
             username="neo4j",
             password="password",
             database="neo4j",
-            namespace="test-cli"
+            namespace="test-cli",
         )
         config = process_config(args)
         assert config["namespace"] == "test-cli"
@@ -476,9 +506,9 @@ class TestNamespaceConfigProcessing:
         os.environ["NEO4J_NAMESPACE"] = "test-env"
         args = args_factory(
             db_url="bolt://localhost:7687",
-            username="neo4j", 
+            username="neo4j",
             password="password",
-            database="neo4j"
+            database="neo4j",
         )
         config = process_config(args)
         assert config["namespace"] == "test-env"
@@ -489,24 +519,28 @@ class TestNamespaceConfigProcessing:
         args = args_factory(
             db_url="bolt://localhost:7687",
             username="neo4j",
-            password="password", 
+            password="password",
             database="neo4j",
-            namespace="test-cli"
+            namespace="test-cli",
         )
         config = process_config(args)
         assert config["namespace"] == "test-cli"
 
-    def test_process_config_namespace_default(self, clean_env, args_factory, mock_logger):
+    def test_process_config_namespace_default(
+        self, clean_env, args_factory, mock_logger
+    ):
         """Test process_config when no namespace is provided (defaults to empty string)."""
         args = args_factory(
             db_url="bolt://localhost:7687",
             username="neo4j",
             password="password",
-            database="neo4j"
+            database="neo4j",
         )
         config = process_config(args)
         assert config["namespace"] == ""
-        mock_logger.info.assert_any_call("Info: No namespace provided for tools. No namespace will be used.")
+        mock_logger.info.assert_any_call(
+            "Info: No namespace provided for tools. No namespace will be used."
+        )
 
     def test_process_config_namespace_empty_string(self, clean_env, args_factory):
         """Test process_config when namespace is explicitly set to empty string."""
@@ -514,8 +548,8 @@ class TestNamespaceConfigProcessing:
             db_url="bolt://localhost:7687",
             username="neo4j",
             password="password",
-            database="neo4j", 
-            namespace=""
+            database="neo4j",
+            namespace="",
         )
         config = process_config(args)
         assert config["namespace"] == ""

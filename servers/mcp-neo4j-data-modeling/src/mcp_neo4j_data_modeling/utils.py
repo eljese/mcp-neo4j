@@ -2,7 +2,7 @@ import argparse
 import json
 import logging
 import os
-from typing import Literal, Union
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -92,7 +92,7 @@ def convert_screaming_snake_case_to_pascal_case(screaming_snake_case: str) -> st
     return screaming_snake_case.replace("_", " ").title().replace(" ", "")
 
 
-def parse_dict_from_json_input(value: Union[str, dict]) -> dict:
+def parse_dict_from_json_input(value: str | dict) -> dict:
     """
     Parse a dictionary from either a JSON string or a dictionary.
 
@@ -378,7 +378,7 @@ def parse_allow_origins(args: argparse.Namespace) -> list[str]:
             logger.info(
                 "Info: No allow origins provided. Defaulting to no allowed origins."
             )
-            return list()
+            return []
 
 
 def parse_allowed_hosts(args: argparse.Namespace) -> list[str]:
@@ -436,7 +436,7 @@ def parse_namespace(args: argparse.Namespace) -> str:
             return ""
 
 
-def process_config(args: argparse.Namespace) -> dict[str, Union[str, int, None]]:
+def process_config(args: argparse.Namespace) -> dict[str, str | int | None]:
     """
     Process the command line arguments and environment variables to create a config dictionary.
     This may then be used as input to the main server function.
@@ -453,7 +453,7 @@ def process_config(args: argparse.Namespace) -> dict[str, Union[str, int, None]]
         The configuration dictionary.
     """
 
-    config = dict()
+    config = {}
 
     # server configuration
     config["transport"] = parse_transport(args)

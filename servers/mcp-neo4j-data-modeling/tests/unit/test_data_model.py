@@ -2,9 +2,8 @@ import json
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
-
 from mcp_neo4j_data_modeling.data_model import DataModel, Node, Property, Relationship
+from pydantic import ValidationError
 
 
 def test_node_add_property_new():
@@ -708,7 +707,7 @@ def test_data_model_from_owl_turtle_str():
     import pathlib
 
     ttl_file = pathlib.Path(__file__).parent.parent / "resources" / "blueplaques.ttl"
-    with open(ttl_file, "r") as f:
+    with open(ttl_file) as f:
         turtle_str = f.read()
 
     data_model = DataModel.from_owl_turtle_str(turtle_str)

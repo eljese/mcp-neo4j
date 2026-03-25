@@ -1,18 +1,19 @@
 import json
 import logging
 import re
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from fastmcp.exceptions import ToolError
 from fastmcp.server import FastMCP
 from fastmcp.tools.tool import TextContent, ToolResult
 from mcp.types import ToolAnnotations
-from neo4j import AsyncDriver, AsyncGraphDatabase, Query, RoutingControl
 from neo4j.exceptions import ClientError, Neo4jError
 from pydantic import Field
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+from neo4j import AsyncDriver, AsyncGraphDatabase, Query, RoutingControl
 
 from .utils import _truncate_string_to_tokens, _value_sanitize
 
@@ -32,7 +33,9 @@ def _format_namespace(namespace: str) -> str:
 def _is_write_query(query: str) -> bool:
     """Check if the query is a write query."""
     return (
-        re.search(r"\b(MERGE|CREATE|INSERT|SET|DELETE|REMOVE|ADD)\b", query, re.IGNORECASE)
+        re.search(
+            r"\b(MERGE|CREATE|INSERT|SET|DELETE|REMOVE|ADD)\b", query, re.IGNORECASE
+        )
         is not None
     )
 
@@ -42,13 +45,11 @@ def create_mcp_server(
     database: str = "neo4j",
     namespace: str = "",
     read_timeout: int = 30,
-    token_limit: Optional[int] = None,
+    token_limit: int | None = None,
     read_only: bool = False,
     config_sample_size: int = 1000,
 ) -> FastMCP:
-    mcp: FastMCP = FastMCP(
-        "mcp-neo4j-cypher", stateless_http=True
-    )
+    mcp: FastMCP = FastMCP("mcp-neo4j-cypher", stateless_http=True)
 
     namespace_prefix = _format_namespace(namespace)
     allow_writes = not read_only
@@ -63,7 +64,12 @@ def create_mcp_server(
             openWorldHint=True,
         ),
     )
-    async def get_neo4j_schema(sample_size: int = Field(default=config_sample_size, description="The sample size used to infer the graph schema. Larger samples are slower, but more accurate. Smaller samples are faster, but might miss information.")) -> list[ToolResult]:
+    async def get_neo4j_schema(
+        sample_size: int = Field(
+            default=config_sample_size,
+            description="The sample size used to infer the graph schema. Larger samples are slower, but more accurate. Smaller samples are faster, but might miss information.",
+        ),
+    ) -> list[ToolResult]:
         """
         Returns nodes, their properties (with types and indexed flags), and relationships
         using APOC's schema inspection.
@@ -79,7 +85,9 @@ def create_mcp_server(
         # Use provided sample_size, otherwise fall back to server default - 1000
         effective_sample_size = sample_size if sample_size else config_sample_size
 
-        logger.info(f"Running `get_neo4j_schema` with sample size {effective_sample_size}.")
+        logger.info(
+            f"Running `get_neo4j_schema` with sample size {effective_sample_size}."
+        )
 
         get_schema_query = f"CALL apoc.meta.schema({{sample: {effective_sample_size}}}) YIELD value RETURN value"
 
@@ -149,7 +157,7 @@ def create_mcp_server(
                 database_=database,
                 result_transformer_=lambda r: r.data(),
             )
-        
+
             logger.debug(f"Read query returned {len(results_json)} rows")
 
             schema_clean = clean_schema(results_json[0].get("value"))
@@ -184,9 +192,11 @@ def create_mcp_server(
         ),
     )
     async def query_neo4j_memory(
-        query: str = Field(..., description="The Cypher query to execute. Must include 'LIMIT X'."),
+        query: str = Field(
+            ..., description="The Cypher query to execute. Must include 'LIMIT X'."
+        ),
         params: dict[str, Any] = Field(
-            dict(), description="The parameters to pass to the Cypher query."
+            {}, description="The parameters to pass to the Cypher query."
         ),
     ) -> list[ToolResult]:
         """Executes a Cypher query against the Neo4j knowledge graph. CRITICAL RULE: Every single query MUST end with a LIMIT clause (e.g., LIMIT 5 or LIMIT 10) to prevent context overflow. Only request the specific properties needed, do not return entire nodes unless necessary."""
@@ -196,7 +206,9 @@ def create_mcp_server(
 
         # Basic enforcement of LIMIT clause
         if "LIMIT" not in query.upper():
-            raise ValueError("CRITICAL RULE VIOLATION: Every Cypher query MUST end with a LIMIT clause (e.g., LIMIT 5).")
+            raise ValueError(
+                "CRITICAL RULE VIOLATION: Every Cypher query MUST end with a LIMIT clause (e.g., LIMIT 5)."
+            )
 
         try:
             query_obj = Query(query, timeout=float(read_timeout))
@@ -240,7 +252,7 @@ def create_mcp_server(
     async def write_neo4j_cypher(
         query: str = Field(..., description="The Cypher query to execute."),
         params: dict[str, Any] = Field(
-            dict(), description="The parameters to pass to the Cypher query."
+            {}, description="The parameters to pass to the Cypher query."
         ),
     ) -> list[ToolResult]:
         """Execute a write Cypher query on the neo4j database."""
@@ -285,13 +297,18 @@ async def main(
     host: str = "127.0.0.1",
     port: int = 8000,
     path: str = "/mcp/",
-    allow_origins: list[str] = [],
-    allowed_hosts: list[str] = [],
+    allow_origins: list[str] = None,
+    allowed_hosts: list[str] = None,
     read_timeout: int = 30,
-    token_limit: Optional[int] = None,
+    token_limit: int | None = None,
     read_only: bool = False,
-    schema_sample_size: Optional[int] = None, # this is known as the config_sample_size in the create_mcp_server function
+    schema_sample_size: int
+    | None = None,  # this is known as the config_sample_size in the create_mcp_server function
 ) -> None:
+    if allowed_hosts is None:
+        allowed_hosts = []
+    if allow_origins is None:
+        allow_origins = []
     logger.info("Starting MCP neo4j Server")
 
     neo4j_driver = AsyncGraphDatabase.driver(
@@ -312,7 +329,13 @@ async def main(
     ]
 
     mcp = create_mcp_server(
-        neo4j_driver, database, namespace, read_timeout, token_limit, read_only, schema_sample_size
+        neo4j_driver,
+        database,
+        namespace,
+        read_timeout,
+        token_limit,
+        read_only,
+        schema_sample_size,
     )
 
     # Run the server with the specified transport

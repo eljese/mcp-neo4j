@@ -1,7 +1,7 @@
 import argparse
 import logging
 import os
-from typing import Any, Union
+from typing import Any
 
 import tiktoken
 
@@ -9,7 +9,7 @@ logger = logging.getLogger("mcp_neo4j_cypher")
 logger.setLevel(logging.INFO)
 
 
-def parse_boolean_safely(value: Union[str, bool]) -> bool:
+def parse_boolean_safely(value: str | bool) -> bool:
     """
     Safely parse a string value to boolean with strict validation.
 
@@ -42,7 +42,7 @@ def parse_boolean_safely(value: Union[str, bool]) -> bool:
         raise ValueError(f"Invalid boolean value: '{value}'. Must be 'true' or 'false'")
 
 
-def process_config(args: argparse.Namespace) -> dict[str, Union[str, int, None]]:
+def process_config(args: argparse.Namespace) -> dict[str, str | int | None]:
     """
     Process the command line arguments and environment variables to create a config dictionary.
     This may then be used as input to the main server function.
@@ -59,7 +59,7 @@ def process_config(args: argparse.Namespace) -> dict[str, Union[str, int, None]]
         The configuration dictionary.
     """
 
-    config = dict()
+    config = {}
 
     # parse uri
     if args.db_url is not None:
@@ -223,7 +223,7 @@ def process_config(args: argparse.Namespace) -> dict[str, Union[str, int, None]]
             logger.info(
                 "Info: No allow origins provided. Defaulting to no allowed origins."
             )
-            config["allow_origins"] = list()
+            config["allow_origins"] = []
 
     # parse allowed hosts for DNS rebinding protection
     if args.allowed_hosts is not None:
@@ -305,7 +305,9 @@ def process_config(args: argparse.Namespace) -> dict[str, Union[str, int, None]]
     else:
         if os.getenv("NEO4J_SCHEMA_SAMPLE_SIZE") is not None:
             try:
-                config["schema_sample_size"] = int(os.getenv("NEO4J_SCHEMA_SAMPLE_SIZE"))
+                config["schema_sample_size"] = int(
+                    os.getenv("NEO4J_SCHEMA_SAMPLE_SIZE")
+                )
                 logger.info(
                     f"Info: Default sample size set to {config['schema_sample_size']} via environment variable."
                 )

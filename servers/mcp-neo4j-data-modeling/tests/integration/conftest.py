@@ -5,10 +5,10 @@ from typing import Any
 
 import pytest
 import pytest_asyncio
-from neo4j import AsyncGraphDatabase
+from mcp_neo4j_data_modeling.server import create_mcp_server
 from testcontainers.neo4j import Neo4jContainer
 
-from mcp_neo4j_data_modeling.server import create_mcp_server
+from neo4j import AsyncGraphDatabase
 
 neo4j = (
     Neo4jContainer("neo4j:latest")

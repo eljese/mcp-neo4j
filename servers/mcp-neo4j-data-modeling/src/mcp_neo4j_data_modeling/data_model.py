@@ -305,11 +305,11 @@ class Node(BaseModel):
             metadata=metadata,
         )
 
-    def to_arrows(
-        self, default_position: dict[str, float] = {"x": 0.0, "y": 0.0}
-    ) -> dict[str, Any]:
+    def to_arrows(self, default_position: dict[str, float] = None) -> dict[str, Any]:
         "Convert a Node to an Arrows Node dictionary. Final JSON string formatting is done at the data model level."
-        props = dict()
+        if default_position is None:
+            default_position = {"x": 0.0, "y": 0.0}
+        props = {}
         [props.update(p.to_arrows(is_key=False)) for p in self.properties]
         props.update(self.key_property.to_arrows(is_key=True))
         return {
@@ -574,7 +574,7 @@ class Relationship(BaseModel):
 
     def to_arrows(self) -> dict[str, Any]:
         "Convert a Relationship to an Arrows Relationship dictionary. Final JSON string formatting is done at the data model level."
-        props = dict()
+        props = {}
         [props.update(p.to_arrows(is_key=False)) for p in self.properties]
         if self.key_property:
             props.update(self.key_property.to_arrows(is_key=True))
@@ -664,7 +664,7 @@ SET end += {{{formatted_props}}}"""
 
         # Build properties section with proper indentation
         # Extract newline to avoid backslash in f-string
-        props_joined = '\n    '.join(props)
+        props_joined = "\n    ".join(props)
         props_section = f"\n    {props_joined}\n" if props else ""
 
         return f"""class {type_pascal_case}(BaseModel):{docstring}
@@ -905,7 +905,7 @@ class DataModel(BaseModel):
             node_color_config += f"classDef node_{idx}_color fill:{NODE_COLOR_PALETTE[idx % len(NODE_COLOR_PALETTE)][0]},stroke:{NODE_COLOR_PALETTE[idx % len(NODE_COLOR_PALETTE)][1]},stroke-width:3px,color:#000,font-size:12px\nclass {node.label} node_{idx}_color\n\n"
 
         return f"""
-%% Styling 
+%% Styling
 {node_color_config}
         """
 

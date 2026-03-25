@@ -5,7 +5,6 @@ from unittest.mock import Mock
 
 import pytest
 from fastmcp.server import FastMCP
-
 from mcp_neo4j_data_modeling.data_model import DataModel, Node, Property, Relationship
 from mcp_neo4j_data_modeling.server import create_mcp_server
 

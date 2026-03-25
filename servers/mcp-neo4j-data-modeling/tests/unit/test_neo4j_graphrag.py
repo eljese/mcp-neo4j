@@ -3,11 +3,10 @@ Test the data model conversion for the Neo4j Graphrag Python Package.
 """
 
 import pytest
+from mcp_neo4j_data_modeling.data_model import DataModel
 from neo4j_graphrag.experimental.components.schema import (
     SchemaBuilder,
 )
-
-from mcp_neo4j_data_modeling.data_model import DataModel
 
 
 @pytest.mark.asyncio

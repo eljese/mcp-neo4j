@@ -2,7 +2,6 @@ import os
 from unittest.mock import patch
 
 import pytest
-
 from mcp_neo4j_data_modeling.utils import (
     parse_allow_origins,
     parse_allowed_hosts,

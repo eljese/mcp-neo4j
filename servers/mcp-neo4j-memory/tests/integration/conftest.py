@@ -1,14 +1,13 @@
 import asyncio
 import os
 import subprocess
-from typing import Any
 
 import pytest
 import pytest_asyncio
-from neo4j import GraphDatabase
+from mcp_neo4j_memory.server import Neo4jMemory, create_mcp_server
 from testcontainers.neo4j import Neo4jContainer
 
-from mcp_neo4j_memory.server import Neo4jMemory, create_mcp_server
+from neo4j import GraphDatabase
 
 neo4j = (
     Neo4jContainer("neo4j:latest")
@@ -17,6 +16,7 @@ neo4j = (
     .with_env("NEO4J_apoc_import_file_use__neo4j__config", "true")
     .with_env("NEO4J_PLUGINS", '["apoc"]')
 )
+
 
 @pytest.fixture(scope="module", autouse=True)
 def setup(request):
@@ -33,6 +33,7 @@ def setup(request):
 
     yield neo4j
 
+
 @pytest_asyncio.fixture(scope="function")
 async def async_neo4j_driver(setup: Neo4jContainer):
     driver = GraphDatabase.driver(
@@ -41,12 +42,14 @@ async def async_neo4j_driver(setup: Neo4jContainer):
     try:
         yield driver
     finally:
-        await driver.close() 
+        await driver.close()
+
 
 @pytest.fixture
 def memory(neo4j_driver):
     """Create a memory instance."""
     return Neo4jMemory(neo4j_driver)
+
 
 @pytest.fixture
 def mcp_server(neo4j_driver, memory):
@@ -58,26 +61,36 @@ def mcp_server(neo4j_driver, memory):
 async def sse_server(setup: Neo4jContainer):
     """Start the MCP server in SSE mode."""
 
-
     process = await asyncio.create_subprocess_exec(
-        "uv", "run", "mcp-neo4j-memory",
-        "--transport", "sse",
-        "--server-host", "127.0.0.1",
-        "--server-port", "8002",
-        "--db-url", setup.get_connection_url(),
-        "--username", setup.username,
-        "--password", setup.password,
-        "--database", "neo4j",
+        "uv",
+        "run",
+        "mcp-neo4j-memory",
+        "--transport",
+        "sse",
+        "--server-host",
+        "127.0.0.1",
+        "--server-port",
+        "8002",
+        "--db-url",
+        setup.get_connection_url(),
+        "--username",
+        setup.username,
+        "--password",
+        setup.password,
+        "--database",
+        "neo4j",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=os.getcwd()
+        cwd=os.getcwd(),
     )
 
     await asyncio.sleep(3)
 
     if process.returncode is not None:
         stdout, stderr = await process.communicate()
-        raise RuntimeError(f"Server failed to start. stdout: {stdout.decode()}, stderr: {stderr.decode()}")
+        raise RuntimeError(
+            f"Server failed to start. stdout: {stdout.decode()}, stderr: {stderr.decode()}"
+        )
 
     yield process
 

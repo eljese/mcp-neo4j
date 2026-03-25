@@ -1,10 +1,8 @@
 """Unit tests for Neo4j Memory models, focusing on regex validation for type and relationType fields."""
 
 import pytest
-from pydantic import ValidationError
-
 from mcp_neo4j_memory.neo4j_memory import Entity, Relation
-
+from pydantic import ValidationError
 
 # Valid type/relationType values that should pass validation
 VALID_TYPES = [
@@ -60,9 +58,15 @@ VALID_TYPES = [
 INVALID_TYPES = [
     # Injection attempts from requirements
     ("KNOWS`]->(to) WITH 1 as x MATCH (n) DETACH DELETE n //", "delete_all_injection"),
-    ("X`]->(to) SET from.observations = ['HACKED BY ATTACKER'] //", "property_modification_injection"),
+    (
+        "X`]->(to) SET from.observations = ['HACKED BY ATTACKER'] //",
+        "property_modification_injection",
+    ),
     ("Person` WITH 1 as x MATCH (n) DETACH DELETE n //", "label_injection"),
-    ("X` WITH 1 as x MATCH (s:Secret) CREATE (e:Exfiltrated {data: s.name + ':' + s.value}) //", "exfiltration_injection"),
+    (
+        "X` WITH 1 as x MATCH (s:Secret) CREATE (e:Exfiltrated {data: s.name + ':' + s.value}) //",
+        "exfiltration_injection",
+    ),
     # Additional injection patterns
     ("Type` MATCH (n) RETURN n //", "simple_match_injection"),
     ("Type`]->(x) DELETE x //", "relationship_delete_injection"),
@@ -129,9 +133,7 @@ VALID_NAMES_WITH_SPECIAL_CHARS = [
 def test_valid_entity_types(type_value):
     """Test that valid type values pass validation for Entity."""
     entity = Entity(
-        name="TestEntity",
-        type=type_value,
-        observations=["Test observation"]
+        name="TestEntity", type=type_value, observations=["Test observation"]
     )
     assert entity.type == type_value
 
@@ -139,11 +141,7 @@ def test_valid_entity_types(type_value):
 @pytest.mark.parametrize("type_value", VALID_TYPES)
 def test_valid_relation_types(type_value):
     """Test that valid relationType values pass validation for Relation."""
-    relation = Relation(
-        source="EntityA",
-        target="EntityB",
-        relationType=type_value
-    )
+    relation = Relation(source="EntityA", target="EntityB", relationType=type_value)
     assert relation.relationType == type_value
 
 
@@ -151,70 +149,50 @@ def test_valid_relation_types(type_value):
 def test_invalid_entity_types(type_value, description):
     """Test that invalid type values fail validation for Entity."""
     with pytest.raises(ValidationError) as exc_info:
-        Entity(
-            name="TestEntity",
-            type=type_value,
-            observations=["Test observation"]
-        )
+        Entity(name="TestEntity", type=type_value, observations=["Test observation"])
     # Verify that the validation error is related to the type field
     errors = exc_info.value.errors()
-    assert any(error["loc"] == ("type",) for error in errors), f"Failed to block {description}: {type_value}"
+    assert any(error["loc"] == ("type",) for error in errors), (
+        f"Failed to block {description}: {type_value}"
+    )
 
 
 @pytest.mark.parametrize("type_value,description", INVALID_TYPES)
 def test_invalid_relation_types(type_value, description):
     """Test that invalid relationType values fail validation for Relation."""
     with pytest.raises(ValidationError) as exc_info:
-        Relation(
-            source="EntityA",
-            target="EntityB",
-            relationType=type_value
-        )
+        Relation(source="EntityA", target="EntityB", relationType=type_value)
     # Verify that the validation error is related to the relationType field
     errors = exc_info.value.errors()
-    assert any(error["loc"] == ("relationType",) for error in errors), f"Failed to block {description}: {type_value}"
+    assert any(error["loc"] == ("relationType",) for error in errors), (
+        f"Failed to block {description}: {type_value}"
+    )
 
 
 @pytest.mark.parametrize("name", VALID_NAMES_WITH_SPECIAL_CHARS)
 def test_entity_name_with_special_chars(name):
     """Entity names should allow special characters since they're parameterized in queries."""
-    entity = Entity(
-        name=name,
-        type="test_type",
-        observations=["Test"]
-    )
+    entity = Entity(name=name, type="test_type", observations=["Test"])
     assert entity.name == name
 
 
 @pytest.mark.parametrize("name", VALID_NAMES_WITH_SPECIAL_CHARS)
 def test_relation_source_with_special_chars(name):
     """Source names should allow special characters since they're parameterized in queries."""
-    relation = Relation(
-        source=name,
-        target="TargetEntity",
-        relationType="TEST_REL"
-    )
+    relation = Relation(source=name, target="TargetEntity", relationType="TEST_REL")
     assert relation.source == name
 
 
 @pytest.mark.parametrize("name", VALID_NAMES_WITH_SPECIAL_CHARS)
 def test_relation_target_with_special_chars(name):
     """Target names should allow special characters since they're parameterized in queries."""
-    relation = Relation(
-        source="SourceEntity",
-        target=name,
-        relationType="TEST_REL"
-    )
+    relation = Relation(source="SourceEntity", target=name, relationType="TEST_REL")
     assert relation.target == name
 
 
 def test_entity_with_minimal_fields():
     """Test Entity creation with minimal valid fields."""
-    entity = Entity(
-        name="Test",
-        type="a",
-        observations=[]
-    )
+    entity = Entity(name="Test", type="a", observations=[])
     assert entity.name == "Test"
     assert entity.type == "a"
     assert entity.observations == []
@@ -222,11 +200,7 @@ def test_entity_with_minimal_fields():
 
 def test_relation_with_minimal_fields():
     """Test Relation creation with minimal valid fields."""
-    relation = Relation(
-        source="A",
-        target="B",
-        relationType="R"
-    )
+    relation = Relation(source="A", target="B", relationType="R")
     assert relation.source == "A"
     assert relation.target == "B"
     assert relation.relationType == "R"

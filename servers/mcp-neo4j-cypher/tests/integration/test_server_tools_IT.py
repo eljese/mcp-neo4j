@@ -9,7 +9,7 @@ from fastmcp.server import FastMCP
 @pytest.mark.asyncio(loop_scope="function")
 async def test_get_neo4j_schema(mcp_server: FastMCP, init_data: Any):
     tool = await mcp_server.get_tool("get_neo4j_schema")
-    response = await tool.run(dict())
+    response = await tool.run({})
 
     schema = json.loads(response.content[0].text)
 
@@ -24,7 +24,7 @@ async def test_get_neo4j_schema(mcp_server: FastMCP, init_data: Any):
 async def test_write_neo4j_cypher(mcp_server: FastMCP):
     query = "CREATE (n:Test {name: 'test', age: 123}) RETURN n.name"
     tool = await mcp_server.get_tool("write_neo4j_cypher")
-    response = await tool.run(dict(query=query))
+    response = await tool.run({"query": query})
 
     result = json.loads(response.content[0].text)
 
@@ -45,7 +45,7 @@ async def test_read_neo4j_cypher(mcp_server: FastMCP, init_data: Any):
     """
 
     tool = await mcp_server.get_tool("read_neo4j_cypher")
-    response = await tool.run(dict(query=query))
+    response = await tool.run({"query": query})
 
     result = json.loads(response.content[0].text)
 
@@ -75,7 +75,7 @@ async def test_read_query_timeout_with_slow_query(
     # The query might timeout and raise a ToolError, or it might complete very fast
     # Let's just verify the server handles it without crashing
     try:
-        response = await tool.run(dict(query=slow_query))
+        response = await tool.run({"query": slow_query})
         # If it completes, verify it returns valid results
         if response.content[0].text:
             result = json.loads(response.content[0].text)
@@ -94,7 +94,7 @@ async def test_read_query_with_normal_timeout_succeeds(
     query = "MATCH (p:Person) RETURN p.name AS name ORDER BY name"
 
     tool = await mcp_server.get_tool("read_neo4j_cypher")
-    response = await tool.run(dict(query=query))
+    response = await tool.run({"query": query})
 
     result = json.loads(response.content[0].text)
 
@@ -113,7 +113,7 @@ async def test_schema_query_timeout(mcp_server_short_timeout: FastMCP):
     # Schema query should typically be fast, but with very short timeout it might timeout
     # depending on the database state. Let's just verify it doesn't crash
     try:
-        response = await tool.run(dict())
+        response = await tool.run({})
         # If it succeeds, verify the response format
         if response.content[0].text:
             schema = json.loads(response.content[0].text)
@@ -133,7 +133,7 @@ async def test_write_query_no_timeout(
     query = "CREATE (n:TimeoutTest {name: 'test', created: timestamp()}) RETURN n.name"
 
     tool = await mcp_server_short_timeout.get_tool("write_neo4j_cypher")
-    response = await tool.run(dict(query=query))
+    response = await tool.run({"query": query})
 
     result = json.loads(response.content[0].text)
 
