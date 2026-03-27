@@ -262,7 +262,8 @@ class Neo4jMemory:
             query = """
             MATCH (entity:Entity)
             OPTIONAL MATCH (o:Observation)-[:OBSERVES_STATE]->(entity)
-            WHERE o.is_deleted IS NULL OR o.is_deleted = false
+            WHERE (o.is_deleted IS NULL OR o.is_deleted = false)
+              AND NOT ()-[:SUPERSEDES]->(o)
             WITH entity, collect(o.content) AS obs
             OPTIONAL MATCH (entity)-[r]->(other:Entity)
             RETURN collect(distinct {
@@ -288,7 +289,8 @@ class Neo4jMemory:
             query = """
             CALL db.index.fulltext.queryNodes('search_entity', $filter) YIELD node as entity, score
             OPTIONAL MATCH (o:Observation)-[:OBSERVES_STATE]->(entity)
-            WHERE o.is_deleted IS NULL OR o.is_deleted = false
+            WHERE (o.is_deleted IS NULL OR o.is_deleted = false)
+              AND NOT ()-[:SUPERSEDES]->(o)
             WITH entity, collect(o.content) AS obs
             OPTIONAL MATCH (entity)-[r]->(other:Entity)
             RETURN collect(distinct {
@@ -872,7 +874,8 @@ class Neo4jMemory:
         // Gather Semantically Relevant Observations (Phase 4: Cognitive Pruning)
         // We match all observations but rank them by their own embedding similarity if available
         OPTIONAL MATCH (o:Observation)-[:OBSERVES_STATE]->(entity)
-        WHERE o.is_deleted IS NULL OR o.is_deleted = false
+        WHERE (o.is_deleted IS NULL OR o.is_deleted = false)
+          AND NOT ()-[:SUPERSEDES]->(o)
         WITH entity, o, combined_score,
              CASE
                 WHEN o.embedding IS NOT NULL THEN

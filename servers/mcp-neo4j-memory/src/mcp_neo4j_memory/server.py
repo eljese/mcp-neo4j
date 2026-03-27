@@ -46,7 +46,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             openWorldHint=True,
         ),
     )
-    async def read_graph() -> ToolResult:
+    async def read_graph(**kwargs) -> ToolResult:
         """Read the entire knowledge graph with all entities and relationships.
 
         Returns the complete memory graph including all stored entities and their relationships.
@@ -66,7 +66,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info("MCP tool: read_graph")
+        logger.info(f"MCP tool: read_graph (kwargs: {kwargs})")
         try:
             result = await memory.read_graph()
             return ToolResult(
@@ -95,6 +95,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ...,
             description="List of entities to create with name, type, observations, and asserted_by",
         ),
+        **kwargs,
     ) -> ToolResult:
         """Create multiple new entities in the knowledge graph.
 
@@ -116,7 +117,9 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(f"MCP tool: create_entities ({len(entities)} entities)")
+        logger.info(
+            f"MCP tool: create_entities ({len(entities)} entities, kwargs: {kwargs})"
+        )
         try:
             entity_objects = [Entity.model_validate(entity) for entity in entities]
             result = await memory.create_entities(entity_objects)
@@ -149,6 +152,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relations: list[Relation] = Field(
             ..., description="List of relations to create between existing entities"
         ),
+        **kwargs,
     ) -> ToolResult:
         """Create multiple new relationships between existing entities in the knowledge graph.
 
@@ -169,7 +173,9 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(f"MCP tool: create_relations ({len(relations)} relations)")
+        logger.info(
+            f"MCP tool: create_relations ({len(relations)} relations, kwargs: {kwargs})"
+        )
         try:
             relation_objects = [
                 Relation.model_validate(relation) for relation in relations
@@ -185,10 +191,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error creating relations: {e}")
-            raise ToolError(f"Neo4j error creating relations: {e}")
+            raise ToolError(f"Neo4j error creating relations: {e}") from e
         except Exception as e:
             logger.error(f"Error creating relations: {e}")
-            raise ToolError(f"Error creating relations: {e}")
+            raise ToolError(f"Error creating relations: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "add_feedback",
@@ -206,6 +212,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relationType: str,
         sentiment: float,
         asserted_by: str = "System",
+        **kwargs,
     ) -> ToolResult:
         """Apply feedback to a relationship to adjust its weight.
 
@@ -213,7 +220,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Positive sentiment increases weight, negative decreases it.
         """
         logger.info(
-            f"MCP tool: add_feedback ({relationType} from {source} to {target})"
+            f"MCP tool: add_feedback ({relationType} from {source} to {target}, kwargs: {kwargs})"
         )
         try:
             feedback = Feedback(
@@ -230,7 +237,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Exception as e:
             logger.error(f"Error adding feedback: {e}")
-            raise ToolError(f"Error adding feedback: {e}")
+            raise ToolError(f"Error adding feedback: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "add_observations",
@@ -246,6 +253,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         observations: list[ObservationAddition] = Field(
             ..., description="List of observations to add to existing entities"
         ),
+        **kwargs,
     ) -> ToolResult:
         """Add new observations/facts to existing entities in the knowledge graph.
 
@@ -266,7 +274,9 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(f"MCP tool: add_observations ({len(observations)} additions)")
+        logger.info(
+            f"MCP tool: add_observations ({len(observations)} additions, kwargs: {kwargs})"
+        )
         try:
             observation_objects = [
                 ObservationAddition.model_validate(obs) for obs in observations
@@ -278,10 +288,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error adding observations: {e}")
-            raise ToolError(f"Neo4j error adding observations: {e}")
+            raise ToolError(f"Neo4j error adding observations: {e}") from e
         except Exception as e:
             logger.error(f"Error adding observations: {e}")
-            raise ToolError(f"Error adding observations: {e}")
+            raise ToolError(f"Error adding observations: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "delete_entities",
@@ -297,6 +307,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         entityNames: list[str] = Field(
             ..., description="List of exact entity names to delete (deprecate)"
         ),
+        **kwargs,
     ) -> ToolResult:
         """Mark entities and their associated observations as deprecated/deleted.
 
@@ -311,7 +322,9 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             "entityNames": ["Old Company", "Outdated Person"]
         }
         """
-        logger.info(f"MCP tool: delete_entities ({len(entityNames)} entities)")
+        logger.info(
+            f"MCP tool: delete_entities ({len(entityNames)} entities, kwargs: {kwargs})"
+        )
         try:
             await memory.delete_entities(entityNames)
             return ToolResult(
@@ -322,10 +335,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error deleting entities: {e}")
-            raise ToolError(f"Neo4j error deleting entities: {e}")
+            raise ToolError(f"Neo4j error deleting entities: {e}") from e
         except Exception as e:
             logger.error(f"Error deleting entities: {e}")
-            raise ToolError(f"Error deleting entities: {e}")
+            raise ToolError(f"Error deleting entities: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "delete_observations",
@@ -341,6 +354,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         deletions: list[ObservationDeletion] = Field(
             ..., description="List of specific observations to deprecate from entities"
         ),
+        **kwargs,
     ) -> ToolResult:
         """Mark specific observations as deleted/deprecated.
 
@@ -360,7 +374,9 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(f"MCP tool: delete_observations ({len(deletions)} deletions)")
+        logger.info(
+            f"MCP tool: delete_observations ({len(deletions)} deletions, kwargs: {kwargs})"
+        )
         try:
             deletion_objects = [
                 ObservationDeletion.model_validate(deletion) for deletion in deletions
@@ -376,10 +392,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error deleting observations: {e}")
-            raise ToolError(f"Neo4j error deleting observations: {e}")
+            raise ToolError(f"Neo4j error deleting observations: {e}") from e
         except Exception as e:
             logger.error(f"Error deleting observations: {e}")
-            raise ToolError(f"Error deleting observations: {e}")
+            raise ToolError(f"Error deleting observations: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "delete_relations",
@@ -395,6 +411,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relations: list[Relation] = Field(
             ..., description="List of specific relationships to delete from the graph"
         ),
+        **kwargs,
     ) -> ToolResult:
         """Delete specific relationships between entities in the knowledge graph.
 
@@ -418,7 +435,9 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
 
         Note: All fields (source, target, relationType) must match exactly for deletion.
         """
-        logger.info(f"MCP tool: delete_relations ({len(relations)} relations)")
+        logger.info(
+            f"MCP tool: delete_relations ({len(relations)} relations, kwargs: {kwargs})"
+        )
         try:
             relation_objects = [
                 Relation.model_validate(relation) for relation in relations
@@ -432,10 +451,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error deleting relations: {e}")
-            raise ToolError(f"Neo4j error deleting relations: {e}")
+            raise ToolError(f"Neo4j error deleting relations: {e}") from e
         except Exception as e:
             logger.error(f"Error deleting relations: {e}")
-            raise ToolError(f"Error deleting relations: {e}")
+            raise ToolError(f"Error deleting relations: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "search_memories",
@@ -462,6 +481,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         entity_type: str | None = Field(
             None, description="Optional: Filter by Entity Type (e.g., 'person')"
         ),
+        **kwargs,
     ) -> ToolResult:
         """Search for entities in the knowledge graph using Hybrid Search (Vector + Fulltext).
 
@@ -476,7 +496,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             KnowledgeGraph: Subgraph containing matching entities and their relationships
         """
         logger.info(
-            f"MCP tool: search_memories ('{query}', top_k={top_k}, hop={include_hop}, node_set={node_set}, type={entity_type})"
+            f"MCP tool: search_memories ('{query}', top_k={top_k}, hop={include_hop}, node_set={node_set}, type={entity_type}, kwargs: {kwargs})"
         )
         try:
             result = await memory.search_memories(
@@ -511,6 +531,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         names: list[str] = Field(
             ..., description="List of exact entity names to retrieve"
         ),
+        **kwargs,
     ) -> ToolResult:
         """Find specific entities by their exact names.
 
@@ -527,7 +548,9 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
 
         This retrieves the entities with exactly those names plus their connections.
         """
-        logger.info(f"MCP tool: find_memories_by_name ({len(names)} names)")
+        logger.info(
+            f"MCP tool: find_memories_by_name ({len(names)} names, kwargs: {kwargs})"
+        )
         try:
             result = await memory.find_memories_by_name(names)
             return ToolResult(
@@ -536,10 +559,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error finding memories by name: {e}")
-            raise ToolError(f"Neo4j error finding memories by name: {e}")
+            raise ToolError(f"Neo4j error finding memories by name: {e}") from e
         except Exception as e:
             logger.error(f"Error finding memories by name: {e}")
-            raise ToolError(f"Error finding memories by name: {e}")
+            raise ToolError(f"Error finding memories by name: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "rebalance_graph",
@@ -551,7 +574,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             openWorldHint=True,
         ),
     )
-    async def rebalance_graph() -> ToolResult:
+    async def rebalance_graph(**kwargs) -> ToolResult:
         """Recalculate impact scores for all entities in the graph.
 
         Uses the Cognitive Impact Scoring (CIS) formula:
@@ -563,7 +586,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Returns:
             str: Summary of the rebalancing operation
         """
-        logger.info("MCP tool: rebalance_graph")
+        logger.info(f"MCP tool: rebalance_graph (kwargs: {kwargs})")
         try:
             count = await memory.rebalance_graph()
             return ToolResult(
@@ -576,10 +599,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error rebalancing graph: {e}")
-            raise ToolError(f"Neo4j error rebalancing graph: {e}")
+            raise ToolError(f"Neo4j error rebalancing graph: {e}") from e
         except Exception as e:
             logger.error(f"Error rebalancing graph: {e}")
-            raise ToolError(f"Error rebalancing graph: {e}")
+            raise ToolError(f"Error rebalancing graph: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "sync_labels",
@@ -591,7 +614,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             openWorldHint=True,
         ),
     )
-    async def sync_labels() -> ToolResult:
+    async def sync_labels(**kwargs) -> ToolResult:
         """One-time migration to ensure all entities have labels matching their 'type' property.
 
         This is required for the tiered decay model to function correctly, as it relies on
@@ -600,7 +623,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Returns:
             str: Summary of the sync operation
         """
-        logger.info("MCP tool: sync_labels")
+        logger.info(f"MCP tool: sync_labels (kwargs: {kwargs})")
         try:
             count = await memory.sync_labels()
             return ToolResult(
@@ -614,10 +637,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error syncing labels: {e}")
-            raise ToolError(f"Neo4j error syncing labels: {e}")
+            raise ToolError(f"Neo4j error syncing labels: {e}") from e
         except Exception as e:
             logger.error(f"Error syncing labels: {e}")
-            raise ToolError(f"Error syncing labels: {e}")
+            raise ToolError(f"Error syncing labels: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "cognify_domain",
@@ -642,6 +665,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         asserted_by: str = Field(
             "System", description="The Persona asserting the summary"
         ),
+        **kwargs,
     ) -> ToolResult:
         """Simplified 'Cognify' step: Summarize a domain's history and supersede existing logs.
 
@@ -660,7 +684,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         }
         """
         logger.info(
-            f"MCP tool: cognify_domain (node_set={node_set}, entity={entityName})"
+            f"MCP tool: cognify_domain (node_set={node_set}, entity={entityName}, kwargs: {kwargs})"
         )
         try:
             result = await memory.cognify_domain(
@@ -672,10 +696,10 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Neo4jError as e:
             logger.error(f"Neo4j error during cognify: {e}")
-            raise ToolError(f"Neo4j error during cognify: {e}")
+            raise ToolError(f"Neo4j error during cognify: {e}") from e
         except Exception as e:
             logger.error(f"Error during cognify: {e}")
-            raise ToolError(f"Error during cognify: {e}")
+            raise ToolError(f"Error during cognify: {e}") from e
 
     @mcp.tool(
         name=namespace_prefix + "vectorize_entities",
@@ -695,6 +719,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             100,
             description="Optional: Maximum number of entities to process if names not provided",
         ),
+        **kwargs,
     ) -> ToolResult:
         """Connect a production-ready vectorization engine to generate embeddings for Neo4j entities.
 
@@ -705,7 +730,9 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Returns:
             str: Summary of the vectorization operation
         """
-        logger.info(f"MCP tool: vectorize_entities (names={names}, limit={limit})")
+        logger.info(
+            f"MCP tool: vectorize_entities (names={names}, limit={limit}, kwargs: {kwargs})"
+        )
         try:
             count = await memory.vectorize_entities(names=names, limit=limit)
             return ToolResult(
@@ -719,7 +746,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             )
         except Exception as e:
             logger.error(f"Error during vectorization: {e}")
-            raise ToolError(f"Error during vectorization: {e}")
+            raise ToolError(f"Error during vectorization: {e}") from e
 
     return mcp
 
