@@ -46,7 +46,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             openWorldHint=True,
         ),
     )
-    async def read_graph(**kwargs) -> ToolResult:
+    async def read_graph() -> ToolResult:
         """Read the entire knowledge graph with all entities and relationships.
 
         Returns the complete memory graph including all stored entities and their relationships.
@@ -66,7 +66,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(f"MCP tool: read_graph (kwargs: {kwargs})")
+        logger.info(f"MCP tool: read_graph")
         try:
             result = await memory.read_graph()
             return ToolResult(
@@ -95,7 +95,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ...,
             description="List of entities to create with name, type, observations, and asserted_by",
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Create multiple new entities in the knowledge graph.
 
@@ -152,7 +152,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relations: list[Relation] = Field(
             ..., description="List of relations to create between existing entities"
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Create multiple new relationships between existing entities in the knowledge graph.
 
@@ -212,7 +212,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relationType: str,
         sentiment: float,
         asserted_by: str = "System",
-        **kwargs,
+
     ) -> ToolResult:
         """Apply feedback to a relationship to adjust its weight.
 
@@ -253,7 +253,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         observations: list[ObservationAddition] = Field(
             ..., description="List of observations to add to existing entities"
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Add new observations/facts to existing entities in the knowledge graph.
 
@@ -307,7 +307,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         entityNames: list[str] = Field(
             ..., description="List of exact entity names to delete (deprecate)"
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Mark entities and their associated observations as deprecated/deleted.
 
@@ -354,7 +354,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         deletions: list[ObservationDeletion] = Field(
             ..., description="List of specific observations to deprecate from entities"
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Mark specific observations as deleted/deprecated.
 
@@ -411,7 +411,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relations: list[Relation] = Field(
             ..., description="List of specific relationships to delete from the graph"
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Delete specific relationships between entities in the knowledge graph.
 
@@ -481,7 +481,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         entity_type: str | None = Field(
             None, description="Optional: Filter by Entity Type (e.g., 'person')"
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Search for entities in the knowledge graph using Hybrid Search (Vector + Fulltext).
 
@@ -531,7 +531,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         names: list[str] = Field(
             ..., description="List of exact entity names to retrieve"
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Find specific entities by their exact names.
 
@@ -574,7 +574,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             openWorldHint=True,
         ),
     )
-    async def rebalance_graph(**kwargs) -> ToolResult:
+    async def rebalance_graph() -> ToolResult:
         """Recalculate impact scores for all entities in the graph.
 
         Uses the Cognitive Impact Scoring (CIS) formula:
@@ -586,7 +586,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Returns:
             str: Summary of the rebalancing operation
         """
-        logger.info(f"MCP tool: rebalance_graph (kwargs: {kwargs})")
+        logger.info(f"MCP tool: rebalance_graph")
         try:
             count = await memory.rebalance_graph()
             return ToolResult(
@@ -614,7 +614,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             openWorldHint=True,
         ),
     )
-    async def sync_labels(**kwargs) -> ToolResult:
+    async def sync_labels() -> ToolResult:
         """One-time migration to ensure all entities have labels matching their 'type' property.
 
         This is required for the tiered decay model to function correctly, as it relies on
@@ -623,7 +623,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Returns:
             str: Summary of the sync operation
         """
-        logger.info(f"MCP tool: sync_labels (kwargs: {kwargs})")
+        logger.info(f"MCP tool: sync_labels")
         try:
             count = await memory.sync_labels()
             return ToolResult(
@@ -665,7 +665,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         asserted_by: str = Field(
             "System", description="The Persona asserting the summary"
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Simplified 'Cognify' step: Summarize a domain's history and supersede existing logs.
 
@@ -719,7 +719,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             100,
             description="Optional: Maximum number of entities to process if names not provided",
         ),
-        **kwargs,
+
     ) -> ToolResult:
         """Connect a production-ready vectorization engine to generate embeddings for Neo4j entities.
 
