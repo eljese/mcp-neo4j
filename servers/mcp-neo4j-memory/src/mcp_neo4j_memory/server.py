@@ -17,6 +17,7 @@ from neo4j import AsyncGraphDatabase
 from .neo4j_memory import (
     Entity,
     Feedback,
+    KnowledgeGraph,
     Neo4jMemory,
     ObservationAddition,
     ObservationDeletion,
