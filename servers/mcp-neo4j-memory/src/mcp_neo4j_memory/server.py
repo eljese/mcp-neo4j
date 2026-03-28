@@ -119,7 +119,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         }
         """
         logger.info(
-            f"MCP tool: create_entities ({len(entities)} entities, kwargs: {kwargs})"
+            f"MCP tool: create_entities ({len(entities)} entities)"
         )
         try:
             entity_objects = [Entity.model_validate(entity) for entity in entities]
@@ -175,7 +175,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         }
         """
         logger.info(
-            f"MCP tool: create_relations ({len(relations)} relations, kwargs: {kwargs})"
+            f"MCP tool: create_relations ({len(relations)} relations)"
         )
         try:
             relation_objects = [
@@ -221,7 +221,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Positive sentiment increases weight, negative decreases it.
         """
         logger.info(
-            f"MCP tool: add_feedback ({relationType} from {source} to {target}, kwargs: {kwargs})"
+            f"MCP tool: add_feedback ({relationType} from {source} to {target})"
         )
         try:
             feedback = Feedback(
@@ -276,7 +276,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         }
         """
         logger.info(
-            f"MCP tool: add_observations ({len(observations)} additions, kwargs: {kwargs})"
+            f"MCP tool: add_observations ({len(observations)} additions)"
         )
         try:
             observation_objects = [
@@ -324,7 +324,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         }
         """
         logger.info(
-            f"MCP tool: delete_entities ({len(entityNames)} entities, kwargs: {kwargs})"
+            f"MCP tool: delete_entities ({len(entityNames)} entities)"
         )
         try:
             await memory.delete_entities(entityNames)
@@ -376,7 +376,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         }
         """
         logger.info(
-            f"MCP tool: delete_observations ({len(deletions)} deletions, kwargs: {kwargs})"
+            f"MCP tool: delete_observations ({len(deletions)} deletions)"
         )
         try:
             deletion_objects = [
@@ -437,7 +437,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Note: All fields (source, target, relationType) must match exactly for deletion.
         """
         logger.info(
-            f"MCP tool: delete_relations ({len(relations)} relations, kwargs: {kwargs})"
+            f"MCP tool: delete_relations ({len(relations)} relations)"
         )
         try:
             relation_objects = [
@@ -497,7 +497,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             KnowledgeGraph: Subgraph containing matching entities and their relationships
         """
         logger.info(
-            f"MCP tool: search_memories ('{query}', top_k={top_k}, hop={include_hop}, node_set={node_set}, type={entity_type}, kwargs: {kwargs})"
+            f"MCP tool: search_memories ('{query}', top_k={top_k}, hop={include_hop}, node_set={node_set}, type={entity_type})"
         )
         try:
             result = await memory.search_memories(
@@ -550,7 +550,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         This retrieves the entities with exactly those names plus their connections.
         """
         logger.info(
-            f"MCP tool: find_memories_by_name ({len(names)} names, kwargs: {kwargs})"
+            f"MCP tool: find_memories_by_name ({len(names)} names)"
         )
         try:
             result = await memory.find_memories_by_name(names)
@@ -685,7 +685,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         }
         """
         logger.info(
-            f"MCP tool: cognify_domain (node_set={node_set}, entity={entityName}, kwargs: {kwargs})"
+            f"MCP tool: cognify_domain (node_set={node_set}, entity={entityName})"
         )
         try:
             result = await memory.cognify_domain(
@@ -732,7 +732,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             str: Summary of the vectorization operation
         """
         logger.info(
-            f"MCP tool: vectorize_entities (names={names}, limit={limit}, kwargs: {kwargs})"
+            f"MCP tool: vectorize_entities (names={names}, limit={limit})"
         )
         try:
             count = await memory.vectorize_entities(names=names, limit=limit)
