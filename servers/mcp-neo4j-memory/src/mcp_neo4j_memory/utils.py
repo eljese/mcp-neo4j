@@ -227,8 +227,14 @@ def process_config(args: argparse.Namespace) -> dict[str, str | int | None]:
             )
             config["namespace"] = ""
 
-        # parse gemini api key
-        if os.getenv("GEMINI_API_KEY") is not None:
-            config["gemini_api_key"] = os.getenv("GEMINI_API_KEY")
+    # parse gemini api key
+    if os.getenv("GEMINI_API_KEY") is not None:
+        config["gemini_api_key"] = os.getenv("GEMINI_API_KEY")
 
-        return config
+    # parse ollama config
+    if os.getenv("OLLAMA_BASE_URL") is not None:
+        config["ollama_base_url"] = os.getenv("OLLAMA_BASE_URL")
+    if os.getenv("OLLAMA_MODEL") is not None:
+        config["ollama_model"] = os.getenv("OLLAMA_MODEL")
+
+    return config

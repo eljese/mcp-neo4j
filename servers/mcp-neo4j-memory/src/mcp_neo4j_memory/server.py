@@ -17,7 +17,6 @@ from neo4j import AsyncGraphDatabase
 from .neo4j_memory import (
     Entity,
     Feedback,
-    KnowledgeGraph,
     Neo4jMemory,
     ObservationAddition,
     ObservationDeletion,
@@ -67,7 +66,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(f"MCP tool: read_graph")
+        logger.info("MCP tool: read_graph")
         try:
             result = await memory.read_graph()
             return ToolResult(
@@ -96,7 +95,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ...,
             description="List of entities to create with name, type, observations, and asserted_by",
         ),
-
     ) -> ToolResult:
         """Create multiple new entities in the knowledge graph.
 
@@ -118,9 +116,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(
-            f"MCP tool: create_entities ({len(entities)} entities)"
-        )
+        logger.info(f"MCP tool: create_entities ({len(entities)} entities)")
         try:
             entity_objects = [Entity.model_validate(entity) for entity in entities]
             result = await memory.create_entities(entity_objects)
@@ -153,7 +149,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relations: list[Relation] = Field(
             ..., description="List of relations to create between existing entities"
         ),
-
     ) -> ToolResult:
         """Create multiple new relationships between existing entities in the knowledge graph.
 
@@ -174,9 +169,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(
-            f"MCP tool: create_relations ({len(relations)} relations)"
-        )
+        logger.info(f"MCP tool: create_relations ({len(relations)} relations)")
         try:
             relation_objects = [
                 Relation.model_validate(relation) for relation in relations
@@ -213,7 +206,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relationType: str,
         sentiment: float,
         asserted_by: str = "System",
-
     ) -> ToolResult:
         """Apply feedback to a relationship to adjust its weight.
 
@@ -254,7 +246,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         observations: list[ObservationAddition] = Field(
             ..., description="List of observations to add to existing entities"
         ),
-
     ) -> ToolResult:
         """Add new observations/facts to existing entities in the knowledge graph.
 
@@ -275,9 +266,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(
-            f"MCP tool: add_observations ({len(observations)} additions)"
-        )
+        logger.info(f"MCP tool: add_observations ({len(observations)} additions)")
         try:
             observation_objects = [
                 ObservationAddition.model_validate(obs) for obs in observations
@@ -308,7 +297,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         entityNames: list[str] = Field(
             ..., description="List of exact entity names to delete (deprecate)"
         ),
-
     ) -> ToolResult:
         """Mark entities and their associated observations as deprecated/deleted.
 
@@ -323,9 +311,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             "entityNames": ["Old Company", "Outdated Person"]
         }
         """
-        logger.info(
-            f"MCP tool: delete_entities ({len(entityNames)} entities)"
-        )
+        logger.info(f"MCP tool: delete_entities ({len(entityNames)} entities)")
         try:
             await memory.delete_entities(entityNames)
             return ToolResult(
@@ -355,7 +341,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         deletions: list[ObservationDeletion] = Field(
             ..., description="List of specific observations to deprecate from entities"
         ),
-
     ) -> ToolResult:
         """Mark specific observations as deleted/deprecated.
 
@@ -375,9 +360,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             ]
         }
         """
-        logger.info(
-            f"MCP tool: delete_observations ({len(deletions)} deletions)"
-        )
+        logger.info(f"MCP tool: delete_observations ({len(deletions)} deletions)")
         try:
             deletion_objects = [
                 ObservationDeletion.model_validate(deletion) for deletion in deletions
@@ -412,7 +395,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         relations: list[Relation] = Field(
             ..., description="List of specific relationships to delete from the graph"
         ),
-
     ) -> ToolResult:
         """Delete specific relationships between entities in the knowledge graph.
 
@@ -436,9 +418,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
 
         Note: All fields (source, target, relationType) must match exactly for deletion.
         """
-        logger.info(
-            f"MCP tool: delete_relations ({len(relations)} relations)"
-        )
+        logger.info(f"MCP tool: delete_relations ({len(relations)} relations)")
         try:
             relation_objects = [
                 Relation.model_validate(relation) for relation in relations
@@ -482,7 +462,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         entity_type: str | None = Field(
             None, description="Optional: Filter by Entity Type (e.g., 'person')"
         ),
-
     ) -> ToolResult:
         """Search for entities in the knowledge graph using Hybrid Search (Vector + Fulltext).
 
@@ -532,7 +511,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         names: list[str] = Field(
             ..., description="List of exact entity names to retrieve"
         ),
-
     ) -> ToolResult:
         """Find specific entities by their exact names.
 
@@ -549,9 +527,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
 
         This retrieves the entities with exactly those names plus their connections.
         """
-        logger.info(
-            f"MCP tool: find_memories_by_name ({len(names)} names)"
-        )
+        logger.info(f"MCP tool: find_memories_by_name ({len(names)} names)")
         try:
             result = await memory.find_memories_by_name(names)
             return ToolResult(
@@ -587,7 +563,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Returns:
             str: Summary of the rebalancing operation
         """
-        logger.info(f"MCP tool: rebalance_graph")
+        logger.info("MCP tool: rebalance_graph")
         try:
             count = await memory.rebalance_graph()
             return ToolResult(
@@ -624,7 +600,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Returns:
             str: Summary of the sync operation
         """
-        logger.info(f"MCP tool: sync_labels")
+        logger.info("MCP tool: sync_labels")
         try:
             count = await memory.sync_labels()
             return ToolResult(
@@ -666,7 +642,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         asserted_by: str = Field(
             "System", description="The Persona asserting the summary"
         ),
-
     ) -> ToolResult:
         """Simplified 'Cognify' step: Summarize a domain's history and supersede existing logs.
 
@@ -720,7 +695,6 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
             100,
             description="Optional: Maximum number of entities to process if names not provided",
         ),
-
     ) -> ToolResult:
         """Connect a production-ready vectorization engine to generate embeddings for Neo4j entities.
 
@@ -731,9 +705,7 @@ def create_mcp_server(memory: Neo4jMemory, namespace: str = "") -> FastMCP:
         Returns:
             str: Summary of the vectorization operation
         """
-        logger.info(
-            f"MCP tool: vectorize_entities (names={names}, limit={limit})"
-        )
+        logger.info(f"MCP tool: vectorize_entities (names={names}, limit={limit})")
         try:
             count = await memory.vectorize_entities(names=names, limit=limit)
             return ToolResult(
