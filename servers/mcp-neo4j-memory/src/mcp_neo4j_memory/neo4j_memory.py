@@ -660,6 +660,7 @@ class Neo4jMemory:
             MATCH (e:Entity { name: $name })
             MERGE (p:Persona { name: 'System' })
 
+            WITH e, p
             CALL {
                 WITH e
                 OPTIONAL MATCH (latest:Observation)-[:OBSERVES_STATE]->(e)
