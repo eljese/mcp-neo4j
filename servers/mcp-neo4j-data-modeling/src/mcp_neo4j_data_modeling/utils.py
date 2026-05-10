@@ -2,7 +2,7 @@ import argparse
 import json
 import logging
 import os
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel
 
@@ -168,7 +168,7 @@ def parse_transport(args: argparse.Namespace) -> Literal["stdio", "http", "sse"]
 
     Returns
     -------
-    transport : str
+    transport : Literal["stdio", "http", "sse"]
     The transport.
 
     Raises
@@ -185,7 +185,7 @@ def parse_transport(args: argparse.Namespace) -> Literal["stdio", "http", "sse"]
             raise ValueError(
                 f"Invalid transport: {args.transport}. Allowed transports are: {ALLOWED_TRANSPORTS}"
             )
-        return args.transport
+        return cast(Literal["stdio", "http", "sse"], args.transport)
     else:
         if os.getenv("NEO4J_TRANSPORT") is not None:
             if os.getenv("NEO4J_TRANSPORT") not in ALLOWED_TRANSPORTS:
@@ -195,10 +195,10 @@ def parse_transport(args: argparse.Namespace) -> Literal["stdio", "http", "sse"]
                 raise ValueError(
                     f"Invalid transport: {os.getenv('NEO4J_TRANSPORT')}. Allowed transports are: {ALLOWED_TRANSPORTS}"
                 )
-            return os.getenv("NEO4J_TRANSPORT")
+            return cast(Literal["stdio", "http", "sse"], os.getenv("NEO4J_TRANSPORT"))
         else:
             logger.info("Info: No transport type provided. Using default: stdio")
-            return "stdio"
+            return cast(Literal["stdio", "http", "sse"], "stdio")
 
 
 def parse_server_host(
@@ -234,7 +234,7 @@ def parse_server_host(
                 logger.warning(
                     "Warning: Server host provided, but transport is `stdio`. The `NEO4J_MCP_SERVER_HOST` environment variable will be set, but ignored."
                 )
-            return os.getenv("NEO4J_MCP_SERVER_HOST")
+            return os.getenv("NEO4J_MCP_SERVER_HOST", "127.0.0.1")
         # if environment variable does not exist and not using stdio transport
         elif transport != "stdio":
             logger.warning(
@@ -244,9 +244,9 @@ def parse_server_host(
         # if environment variable does not exist and using stdio transport
         else:
             logger.info(
-                "Info: No server host provided and transport is `stdio`. `server_host` will be None."
+                "Info: No server host provided and transport is `stdio`. `server_host` will be empty string."
             )
-            return None
+            return ""
 
 
 def parse_server_port(
@@ -282,7 +282,7 @@ def parse_server_port(
                 logger.warning(
                     "Warning: Server port provided, but transport is `stdio`. The `NEO4J_MCP_SERVER_PORT` environment variable will be set, but ignored."
                 )
-            return int(os.getenv("NEO4J_MCP_SERVER_PORT"))
+            return int(os.getenv("NEO4J_MCP_SERVER_PORT", "8000"))
         # if environment variable does not exist and not using stdio transport
         elif transport != "stdio":
             logger.warning(
@@ -292,9 +292,9 @@ def parse_server_port(
         # if environment variable does not exist and using stdio transport
         else:
             logger.info(
-                "Info: No server port provided and transport is `stdio`. `server_port` will be None."
+                "Info: No server port provided and transport is `stdio`. `server_port` will be 0."
             )
-            return None
+            return 0
 
 
 def parse_server_path(
@@ -330,7 +330,7 @@ def parse_server_path(
                 logger.warning(
                     "Warning: Server path provided, but transport is `stdio`. The `NEO4J_MCP_SERVER_PATH` environment variable will be set, but ignored."
                 )
-            return os.getenv("NEO4J_MCP_SERVER_PATH")
+            return os.getenv("NEO4J_MCP_SERVER_PATH", "/mcp/")
         # if environment variable does not exist and not using stdio transport
         elif transport != "stdio":
             logger.warning(
@@ -340,9 +340,9 @@ def parse_server_path(
         # if environment variable does not exist and using stdio transport
         else:
             logger.info(
-                "Info: No server path provided and transport is `stdio`. `server_path` will be None."
+                "Info: No server path provided and transport is `stdio`. `server_path` will be empty string."
             )
-            return None
+            return ""
 
 
 def parse_allow_origins(args: argparse.Namespace) -> list[str]:
@@ -428,7 +428,7 @@ def parse_namespace(args: argparse.Namespace) -> str:
             logger.info(
                 f"Info: Namespace provided for tools: {os.getenv('NEO4J_NAMESPACE')}"
             )
-            return os.getenv("NEO4J_NAMESPACE")
+            return os.getenv("NEO4J_NAMESPACE", "")
         else:
             logger.info(
                 "Info: No namespace provided for tools. No namespace will be used."
@@ -436,7 +436,7 @@ def parse_namespace(args: argparse.Namespace) -> str:
             return ""
 
 
-def process_config(args: argparse.Namespace) -> dict[str, str | int | None]:
+def process_config(args: argparse.Namespace) -> dict[str, str | int | list[str] | None]:
     """
     Process the command line arguments and environment variables to create a config dictionary.
     This may then be used as input to the main server function.
@@ -449,17 +449,23 @@ def process_config(args: argparse.Namespace) -> dict[str, str | int | None]:
 
     Returns
     -------
-    config : dict[str, str]
+    config : dict[str, Any]
         The configuration dictionary.
     """
 
-    config = {}
+    config: dict[str, str | int | list[str] | None] = {}
 
     # server configuration
     config["transport"] = parse_transport(args)
-    config["host"] = parse_server_host(args, config["transport"])
-    config["port"] = parse_server_port(args, config["transport"])
-    config["path"] = parse_server_path(args, config["transport"])
+    config["host"] = parse_server_host(
+        args, cast(Literal["stdio", "http", "sse"], config["transport"])
+    )
+    config["port"] = parse_server_port(
+        args, cast(Literal["stdio", "http", "sse"], config["transport"])
+    )
+    config["path"] = parse_server_path(
+        args, cast(Literal["stdio", "http", "sse"], config["transport"])
+    )
 
     # namespace configuration
     config["namespace"] = parse_namespace(args)

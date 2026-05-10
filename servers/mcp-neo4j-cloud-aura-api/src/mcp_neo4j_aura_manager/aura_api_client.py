@@ -49,8 +49,8 @@ class AuraAPIClient:
                 or token_data.get("token_type").lower() != "bearer"
             ):
                 raise Exception("Invalid token response format")
-            self.token = token_data["access_token"]
-            return self.token
+            self.token = str(token_data["access_token"])
+            return str(self.token)
         except requests.RequestException as e:
             logger.error(f"Authentication error: {str(e)}")
             raise Exception(f"Failed to authenticate with Neo4j Aura API: {str(e)}")
@@ -67,7 +67,7 @@ class AuraAPIClient:
             "Accept": "application/json",
         }
 
-    def _handle_response(self, response: requests.Response) -> dict[str, Any]:
+    def _handle_response(self, response: requests.Response) -> Any:
         """Handle API response and errors."""
         try:
             response.raise_for_status()
@@ -101,7 +101,7 @@ class AuraAPIClient:
 
     def get_instance_details(
         self, instance_ids: str | list[str]
-    ) -> dict[str, Any] | list[dict[str, Any]]:
+    ) -> Any | list[dict[str, Any]]:
         """Get details for one or more instances by ID.
 
         Args:
@@ -128,7 +128,7 @@ class AuraAPIClient:
                     results.append({"error": str(e), "instance_id": instance_id})
             return results
 
-    def get_instance_by_name(self, name: str) -> dict[str, Any] | None:
+    def get_instance_by_name(self, name: str) -> Any | None:
         """Find an instance by name."""
         instances = self.list_instances()
         for instance in instances:
@@ -149,7 +149,7 @@ class AuraAPIClient:
         cloud_provider: str = "gcp",
         graph_analytics_plugin: bool = False,
         source_instance_id: str = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Create a new database instance."""
         if tenant_id is None:
             raise ValueError("tenant_id is required")
@@ -234,7 +234,7 @@ class AuraAPIClient:
         memory: int | None = None,
         vector_optimized: bool | None = None,
         storage: int | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Update an existing instance."""
         payload = {}
         if name is not None:
@@ -260,13 +260,13 @@ class AuraAPIClient:
         response = requests.patch(url, headers=self._get_headers(), json=payload)
         return self._handle_response(response)
 
-    def pause_instance(self, instance_id: str) -> dict[str, Any]:
+    def pause_instance(self, instance_id: str) -> Any:
         """Pause a database instance."""
         url = f"{self.BASE_URL}/instances/{instance_id}/pause"
         response = requests.post(url, headers=self._get_headers())
         return self._handle_response(response)
 
-    def resume_instance(self, instance_id: str) -> dict[str, Any]:
+    def resume_instance(self, instance_id: str) -> Any:
         """Resume a paused database instance."""
         url = f"{self.BASE_URL}/instances/{instance_id}/resume"
         response = requests.post(url, headers=self._get_headers())
@@ -278,13 +278,13 @@ class AuraAPIClient:
         response = requests.get(url, headers=self._get_headers())
         return self._handle_response(response)
 
-    def get_tenant_details(self, tenant_id: str) -> dict[str, Any]:
+    def get_tenant_details(self, tenant_id: str) -> Any:
         """Get details for a specific tenant/project."""
         url = f"{self.BASE_URL}/tenants/{tenant_id}"
         response = requests.get(url, headers=self._get_headers())
         return self._handle_response(response)
 
-    def delete_instance(self, instance_id: str) -> dict[str, Any]:
+    def delete_instance(self, instance_id: str) -> Any:
         """Delete a database instance.
 
         Args:

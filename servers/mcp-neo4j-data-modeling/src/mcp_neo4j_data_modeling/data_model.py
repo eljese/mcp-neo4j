@@ -872,7 +872,7 @@ class DataModel(BaseModel):
     def remove_node(self, node_label: str) -> None:
         "Remove a node from the data model."
         try:
-            [self.nodes.remove(x) for x in self.nodes if x.label == node_label]
+            self.nodes = [x for x in self.nodes if x.label != node_label]
         except ValueError:
             pass
 
@@ -888,14 +888,8 @@ class DataModel(BaseModel):
             relationship_type,
             relationship_end_node_label,
         )
-        try:
-            [
-                self.relationships.remove(x)
-                for x in self.relationships
-                if x.pattern == pattern
-            ]
-        except ValueError:
-            pass
+        # Remove relationships
+        self.relationships = [x for x in self.relationships if x.pattern != pattern]
 
     def _generate_mermaid_config_styling_str(self) -> str:
         "Generate the Mermaid configuration string for the data model."
@@ -1078,7 +1072,7 @@ class DataModel(BaseModel):
             classes.add(str(s).split("#")[-1].split("/")[-1])
 
         # Extract DatatypeProperties
-        datatype_props = {}
+        datatype_props: dict[str, list[dict[str, str]]] = {}
         for prop in g.subjects(RDF.type, OWL.DatatypeProperty):
             prop_name = str(prop).split("#")[-1].split("/")[-1]
             domains = list(g.objects(prop, RDFS.domain))
@@ -1182,11 +1176,16 @@ class DataModel(BaseModel):
         Generate a list of Cypher queries to create constraints on the data model.
         This creates range indexes on the key properties of the nodes and relationships and enforces uniqueness and existence of the key properties.
         """
-        node_queries = [n.get_cypher_constraint_query() + ";" for n in self.nodes]
+        node_queries = [
+            n.get_cypher_constraint_query() + ";"
+            for n in self.nodes
+            if n.get_cypher_constraint_query() is not None
+        ]
         relationship_queries = [
-            r.get_cypher_constraint_query() + ";"
+            str(r.get_cypher_constraint_query()) + ";"
             for r in self.relationships
             if r.key_property is not None
+            and r.get_cypher_constraint_query() is not None
         ]
         return node_queries + relationship_queries
 
@@ -1363,7 +1362,7 @@ class DataModel(BaseModel):
         patterns = schema.get("patterns", [])
 
         # Create a mapping from relationship type to its pattern
-        relationship_pattern_map = {}
+        relationship_pattern_map: dict[str, list[tuple[str, str]]] = {}
         for pattern in patterns:
             start_label, rel_type, end_label = pattern
             if rel_type not in relationship_pattern_map:

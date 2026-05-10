@@ -1,0 +1,5 @@
+    # middleware configuration
+    config["allow_origins"] = parse_allow_origins(args)
+    config["allowed_hosts"] = parse_allowed_hosts(args)
+
+    return config

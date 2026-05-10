@@ -1,3 +1,5 @@
+import argparse
+import os
 from typing import Literal
 
 from fastmcp.server import FastMCP
@@ -8,7 +10,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .aura_manager import AuraManager
-from .utils import format_namespace, get_logger
+from .utils import format_namespace, get_logger, process_config
 
 logger = get_logger(__name__)
 
@@ -315,5 +317,43 @@ async def main(
             )
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Neo4j Aura Database Instance Manager")
+    parser.add_argument(
+        "--client-id",
+        help="Neo4j Aura API Client ID",
+        default=os.environ.get("NEO4J_AURA_CLIENT_ID"),
+    )
+    parser.add_argument(
+        "--client-secret",
+        help="Neo4j Aura API Client Secret",
+        default=os.environ.get("NEO4J_AURA_CLIENT_SECRET"),
+    )
+    parser.add_argument("--transport", default=None, help="Transport type")
+    parser.add_argument("--namespace", default=None, help="Tool namespace prefix")
+    parser.add_argument("--server-host", default=None, help="Server host")
+    parser.add_argument("--server-port", default=None, help="Server port")
+    parser.add_argument("--server-path", default=None, help="Server path")
+    parser.add_argument(
+        "--allow-origins",
+        default=None,
+        help="Allow origins for remote servers (comma-separated list)",
+    )
+    parser.add_argument(
+        "--allowed-hosts",
+        default=None,
+        help="Allowed hosts for DNS rebinding protection on remote servers(comma-separated list)",
+    )
+    parser.add_argument(
+        "--stateless",
+        action="store_true",
+        help="Enable stateless mode for HTTP/SSE transports (default: False)",
+    )
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    main()
+    import asyncio
+
+    args = parse_args()
+    asyncio.run(main(**process_config(args)))
